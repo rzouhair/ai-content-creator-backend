@@ -1,3 +1,4 @@
+import copy
 import re
 from django.shortcuts import get_object_or_404, render
 import requests
@@ -18,7 +19,7 @@ from bs4 import BeautifulSoup
 from core.helpers import get_html_content, unescape_html, get_response_content
 from .helpers.cluster_keywords import cluster_keywords
 from .helpers.get_article_info import get_article_info
-from .helpers.search_results import get_search_query_html, get_organic_search_results, get_keyword_questions
+from .helpers.search_results import get_search_query_html, get_organic_search_results, get_keyword_questions, merge_questions
 
 from .models import Search, Suggestion
 from .serializers import SearchGetSerializer, SearchSerializer, SuggestionSerializer
@@ -199,6 +200,26 @@ def getSuggestionSearch(request, _id):
         **json.loads(dumped_json)
     })
 
+@api_view(['GET'])
+def reanalyzeQuestions(request, _id):
+    suggestion = get_object_or_404(Suggestion, _id=_id)
+    search = Search.objects.get(related_suggestion_id=suggestion)
+    serializer = SearchGetSerializer(search)
+
+    pure_questions = list(map(lambda x: x['question'], json.loads(serializer.data['questions'])))
+
+    old_questions = copy.deepcopy(json.loads(serializer.data['questions']))
+    
+    for q in pure_questions:
+        current_question = get_keyword_questions(q)
+        old_questions = merge_questions(old_questions, current_question)
+    
+
+    return Response({
+        "questions": old_questions,
+        "others": pure_questions,
+    })
+
 @api_view(['POST'])
 def analyze_suggestion(request, suggestion_id):
     suggestion = Suggestion.objects.get(_id=suggestion_id)
@@ -229,6 +250,7 @@ def keywordClustering(request):
 def getRelatedQuestions(request):
     search_query = request.data.get('search_query', None)
 
+    # test
     if search_query == None:
         return Response('No search query provided', status=status.HTTP_400_BAD_REQUEST)
     
@@ -300,7 +322,8 @@ def google_search(request):
         middle_part = tag.select_one('div[data-sncf="1"]')
         footer_part = tag.select_one('div[data-sncf="2"]')
 
-        snippet = tag.select_one('div[role="heading"] span span')
+        snippet_heading = tag.select_one('div[role="heading"]')
+
 
         result = {
             'position': i + 1,
@@ -319,21 +342,23 @@ def google_search(request):
         if header_part != None:
             title = header_part.select_one('h3')
             displayed_link = header_part.select_one('cite')
-            displayed_name_parent = displayed_link.find_previous(lambda tag: tag.name == 'span')
-            result['serp_header'] = {
-                "title": title.text if title else None,
-                "displayed_link": displayed_link.text if displayed_link else None,
-                "displayed_name": displayed_name_parent.text if displayed_name_parent else str(displayed_name_parent)
-            }
+            if displayed_link != None:
+                displayed_name_parent = displayed_link.find_previous(lambda tag: tag.name == 'span')
+                result['serp_header'] = {
+                    "title": title.text if title else None,
+                    "displayed_link": displayed_link.text if displayed_link else None,
+                    "displayed_name": displayed_name_parent.text if displayed_name_parent else str(displayed_name_parent)
+                }
         else:
             title = tag.select_one('h3')
             displayed_link = tag.select_one('cite')
-            displayed_name_parent = displayed_link.find_previous(lambda tag: tag.name == 'span')
-            result['serp_header'] = {
-                "title": title.text if title else None,
-                "displayed_link": displayed_link.text if displayed_link else None,
-                "displayed_name": displayed_name_parent.text if displayed_name_parent else str(displayed_name_parent)
-            }
+            if displayed_link != None:
+                displayed_name_parent = displayed_link.find_previous(lambda tag: tag.name == 'span')
+                result['serp_header'] = {
+                    "title": title.text if title else None,
+                    "displayed_link": displayed_link.text if displayed_link else None,
+                    "displayed_name": displayed_name_parent.text if displayed_name_parent else str(displayed_name_parent)
+                }
 
 
         if middle_part != None:
@@ -357,15 +382,31 @@ def google_search(request):
             match = re.search(pattern, link)
             if match:
                 result["domain"] = match.group(1)
-                post_content = get_post_info(link)
-                result["post_content"] = post_content
+                try:
+                    post_content = get_post_info(link)
+                    result["post_content"] = post_content
+                except Exception as e:
+                    print("Maybe an error here")
+                    print(f"Exception at {link} - to continue")
+                    continue
 
-        if (snippet != None):
-            result['snippet'] = {
-                "content": snippet.get_text().strip(),
-                "highlighted_word": snippet.select_one('b').get_text().strip() if snippet.select_one('b') else None,
-                "html": str(snippet)
+        result["snippet"] = {}
+
+        if (snippet_heading != None):
+            result['snippet']["heading"] = {
+                "content": snippet_heading.get_text().strip(),
+                "highlighted_word": snippet_heading.select_one('b').get_text().strip() if snippet_heading.select_one('b') else None,
+                "html": str(snippet_heading)
             }
+            print(f"======= SNIPPET PARENT =======")
+            print(str(snippet_heading.find_next_sibling()))
+            snippet_body = snippet_heading.find_next_siblings()
+            if (snippet_body != None):
+                result['snippet']["body"] = str(snippet_body)
+            
+            print(f"======= SNIPPET PARENT =======")
+
+        
         
         
         # Append the search result to the list of results

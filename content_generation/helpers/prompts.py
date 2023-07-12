@@ -1,7 +1,9 @@
 import openai
 import json
 
-openai.api_key = "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"
+# sk-THOWTtzJ1MmxKZkswur5T3BlbkFJyhkR1IfLQVPTiqMm38R
+openai.api_key = "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"
+
 
 def chat_scaffold(messages):
   resp = openai.ChatCompletion.create(

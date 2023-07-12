@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404, render
 from content_generation.models import Document, Output, Project, Prompt, Skill, Tag
-from content_generation.serializers import DocumentSerializer, OutputSerializer, ProjectSerializer, PromptSerializer, SkillGetSerializer, SkillSerializer, TagSerializer
+from content_generation.serializers import DocumentGetSerializer, DocumentSerializer, OutputSerializer, ProjectSerializer, PromptSerializer, SkillGetSerializer, SkillSerializer, TagSerializer
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
@@ -217,7 +217,7 @@ def documentActions(request, _id=None):
     if request.method == 'GET':
         if _id is not None:
             document = get_object_or_404(Document, _id=_id)
-            serializer = DocumentSerializer(document)
+            serializer = DocumentGetSerializer(document)
             return Response(serializer.data)
         else:
             order_by = request.GET.get('order_by', '-created_at')
@@ -227,7 +227,7 @@ def documentActions(request, _id=None):
             else:
               document = Document.objects.all().order_by(order_by)
 
-            serializer = DocumentSerializer(document, many=True)
+            serializer = DocumentGetSerializer(document, many=True)
             return Response(serializer.data)
     
     elif request.method == 'POST':
@@ -342,7 +342,13 @@ def execute(request):
   if request.data['skill_id'] == None or request.data['inputs'] == None:
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
-  prompt = get_object_or_404(Prompt, skill=request.data['skill_id'])
+  try:
+    prompt = get_object_or_404(Prompt, skill=request.data['skill_id'])
+  except:
+    print("==========")
+    print(request.data['skill_id'])
+    print("==========")
+    return Response(status=status.HTTP_400_BAD_REQUEST)
   prompt_text = prompt.prompt
 
   for _id, value in request.data['inputs'].items():

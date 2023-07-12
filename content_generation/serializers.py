@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+from keywordresearch.serializers import SuggestionSerializer
 from rest_framework import serializers
 from .models import Document, Output, Project, Prompt, Recipe, Skill, Tag
 
@@ -14,7 +15,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class SkillGetSerializer(serializers.ModelSerializer):
-    tags = TagSerializer(many=True)    
+    tags = TagSerializer(many=True)
 
     class Meta:
         model = Skill
@@ -53,6 +54,12 @@ class RecipeSerializer(serializers.ModelSerializer):
 
 
 class DocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Document
+        fields = ('__all__')
+
+class DocumentGetSerializer(serializers.ModelSerializer):
+    suggestion = SuggestionSerializer(many=False)
     class Meta:
         model = Document
         fields = ('__all__')

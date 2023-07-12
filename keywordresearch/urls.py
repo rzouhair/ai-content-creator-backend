@@ -10,6 +10,7 @@ urlpatterns = [
     path('suggestions/', views.suggestionsActions, name='suggestions-all'),
     path('suggestions/<uuid:_id>/', views.suggestionsActions, name='suggestions-actions'),
     path('suggestions/<uuid:_id>/search', views.getSuggestionSearch, name='suggestions-search'),
+    path('suggestions/<uuid:_id>/search/analyze-questions', views.reanalyzeQuestions, name='suggestions-questions'),
     path('searches/', views.searchActions, name='search-all'),
     path('searches/<uuid:_id>/', views.searchActions, name='search-actions'),
     path('analyze-query/', views.google_search, name='google-actions'),

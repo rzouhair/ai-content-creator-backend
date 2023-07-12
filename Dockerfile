@@ -21,4 +21,6 @@ RUN pip install --no-cache-dir --use-deprecated=legacy-resolver -r requirements.
 
 RUN pip install psycopg2-binary
 
+RUN pip install keybert[spacy]
+
 COPY . /code/

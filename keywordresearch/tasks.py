@@ -1,7 +1,7 @@
 from celery import shared_task
 from keywordresearch.helpers.search_results import analyze_google_search, get_keyword_questions, get_organic_search_results, get_search_query_html
-from keywordresearch.models import Suggestion
-from keywordresearch.serializers import SearchSerializer
+from keywordresearch.models import Search, Suggestion
+from keywordresearch.serializers import SearchGetSerializer, SearchSerializer
 import json
 
 @shared_task
@@ -34,7 +34,23 @@ def analyze_search_results(suggestion_id):
       suggestion.status = "ANALYZED"
       suggestion.save()  
     except Exception as e: # work on python 3.x
-      print('Failed to upload to ftp: '+ str(e))
+      print('An error during search results analysis: '+ str(e))
+      suggestion.status = "ERROR"
+      suggestion.save()  
+
+@shared_task
+def reanalyze_questions(suggestion_id):
+    try:
+      print("========== STARTED REANALYZING ==========")
+      suggestion = Suggestion.objects.get(_id=suggestion_id)
+      # questions = get_keyword_questions(suggestion.search_query)
+
+      search = Search.objects.get(related_suggestion_id=suggestion)
+
+      print(search)
+
+    except Exception as e: # work on python 3.x
+      print('Error during reanalysis: '+ str(e))
       suggestion.status = "ERROR"
       suggestion.save()  
 

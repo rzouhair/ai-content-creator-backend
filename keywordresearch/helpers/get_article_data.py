@@ -1,6 +1,25 @@
 import re
 from bs4 import BeautifulSoup
 import requests
+from keybert import KeyBERT
+
+import numpy as np
+import spacy
+import nltk
+from nltk.corpus import stopwords
+from rake_nltk import Rake, Metric
+from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer, WordNetLemmatizer
+
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+
+from nltk.probability import FreqDist
+
+
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
+
 
 def get_article_data(art, body):
   article = BeautifulSoup(str(art), 'html.parser')
@@ -53,7 +72,7 @@ def get_article_data(art, body):
   }
 
 def get_article_content(soup):
-  content_classes = ['entry-content', 'post-content', 'the-content', 'content-area', 'article-content', 'body-content', 'single-post-content', 'entry-inner', 'entry', 'post', 'content', 'body-content', 'bodyContent']
+  content_classes = ['entry-content', 'post-content', 'the-content', 'content-area', 'article-content', 'body-content', 'single-post-content', 'entry-inner', 'entry', 'post', 'type-post', 'content', 'body-content', 'bodyContent']
   content_ids = ['content', 'main-content', 'post-content', 'article-body', 'article', 'main-article', 'bodyContent', 'body-content']
   content_tags = ['main', 'article']
 
@@ -88,10 +107,41 @@ def calculate_headings_length(soup):
         total_length += len(heading.text.split())
 
     return total_length
+  
+def extract_keywords(text, min_length=3, top_n=5):
+      # Tokenization
+    tokens = word_tokenize(text.lower())
+
+    # Stop words
+    stop_words = set(stopwords.words('english'))
+    filtered_tokens = [token for token in tokens if not token in stop_words]
+
+    # Lemmatization
+    lemmatizer = WordNetLemmatizer()
+    lemmatized_tokens = [lemmatizer.lemmatize(token) for token in filtered_tokens if len(token) >= min_length]
+
+    # TF-IDF
+    vectorizer = TfidfVectorizer()
+    vectorizer.fit_transform([text])
+    feature_names = vectorizer.get_feature_names_out()
+    feature_names_arr = np.array(feature_names)   # Convert feature_names to a NumPy array
+
+    tfidf_scores = {}
+    for token in lemmatized_tokens:
+        if token in feature_names_arr:   # Use the NumPy array to check if token is in feature_names
+            score = vectorizer.idf_[np.where(feature_names_arr == token)]   # Use np.where() to get index of token
+            tfidf_scores[token] = score[0]   # Get the first element of the score array
+
+    # Get the top N keywords based on TF-IDF score
+    top_keywords = sorted(tfidf_scores.items(), key=lambda x:x[1], reverse=True)[:top_n]
+
+    return top_keywords
 
 def get_post_info(url):
 
     try:
+      nltk.download('stopwords')
+      nltk.download('punkt')
       # Make a request to the blog post url and get the HTML content
       print(f"============== TESTING {url} =============")
       response = requests.get(url, timeout=5)
@@ -119,8 +169,19 @@ def get_post_info(url):
       print(f"============== GOT CONTENT =============")
       word_count = len(content.text.split())
       word_count_with_headings = word_count + calculate_headings_length(soup) + (len(blog_title.split()) if blog_title else 0)
-      paragraphs_count = len(content.find_all('p'))
-      headings_count = len(content.find_all(['h1', 'h2', 'h3'])) + (1 if blog_title else 0)
+
+      kw_model = KeyBERT()
+      # frequent_kws = kw_model.extract_keywords(content.text, keyphrase_ngram_range=(1, 1), stop_words='english',use_maxsum=True, nr_candidates=30, top_n=20)
+      # frequent_kws = kw_model.extract_keywords(content.text, keyphrase_ngram_range=(1, 3), stop_words='english', use_mmr=True, nr_candidates=5, top_n=10)
+      frequent_kws = kw_model.extract_keywords(content.text, keyphrase_ngram_range=(2, 3), stop_words='english', top_n=30, use_mmr=True)
+
+      top_kws = sorted(frequent_kws, key=lambda x:x[1], reverse=True)
+      
+      paragraphs = content.find_all('p')
+      headings = content.find_all(['h1', 'h2', 'h3'])
+      
+      paragraphs_count = len(paragraphs)
+      headings_count = len(headings) + (1 if blog_title else 0)
 
       # Get the images count
       images_count = len(content.find_all('img'))
@@ -139,26 +200,27 @@ def get_post_info(url):
           else:
               return ""
 
-      for link in content.select('a'):
-          href = link.get_attribute_list('href')[0]
+      if content != None:
+        for link in content.select('a'):
+            href = link.get_attribute_list('href')[0]
 
-          if href is not None:
-              links.append({
-                  "link": str(href),
-                  "domain": get_domain(href) if not href.startswith('#') else get_domain(url),
-                  "is_internal": href.startswith('#') or href.startswith('/') or get_domain(href) == get_domain(url)
-              })
-              if 'mailto:' in href:
-                  external_links_count += 1
-                  continue
-              if href.startswith('#'):
-                  internal_links_count += 1
-              else:
-                  # This assumes that internal links are on the same domain
-                  if get_domain(href) == get_domain(url):
-                      internal_links_count += 1
-                  else:
-                      external_links_count += 1
+            if href is not None:
+                links.append({
+                    "link": str(href),
+                    "domain": get_domain(href) if not href.startswith('#') else get_domain(url),
+                    "is_internal": href.startswith('#') or href.startswith('/') or get_domain(href) == get_domain(url)
+                })
+                if 'mailto:' in href:
+                    external_links_count += 1
+                    continue
+                if href.startswith('#'):
+                    internal_links_count += 1
+                else:
+                    # This assumes that internal links are on the same domain
+                    if get_domain(href) == get_domain(url):
+                        internal_links_count += 1
+                    else:
+                        external_links_count += 1
 
 
       # Get the table of contents
@@ -180,6 +242,7 @@ def get_post_info(url):
           'headings_count': headings_count,
           'images_count': images_count,
           'links_count': links_count,
+          'frequent_keywords': [row[0] for row in top_kws],
           "link": {
               "count": links_count,
               "internal": internal_links_count,
@@ -193,3 +256,4 @@ def get_post_info(url):
     
     except Exception as e:
        print(f"Exception at ({url}) - {str(e)}")
+
