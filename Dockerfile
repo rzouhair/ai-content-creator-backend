@@ -1,7 +1,7 @@
 FROM python:3.8-slim
 ENV PYTHONUNBUFFERED=1
 
-RUN pip install --upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
 
 
 RUN apt-get update && apt-get install -y \
@@ -19,8 +19,8 @@ COPY requirements.txt /code/
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install psycopg2-binary
+RUN pip install --no-cache-dir psycopg2-binary
 
-RUN pip install keybert[spacy]
+RUN pip install --no-cache-dir keybert[spacy]
 
 COPY . /code/
