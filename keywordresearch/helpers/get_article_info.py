@@ -2,7 +2,6 @@
 # from rake_nltk import Rake
 import nltk
 from bs4 import BeautifulSoup
-from keybert import KeyBERT
 
 from .get_article_data import get_article_data
 
@@ -31,10 +30,10 @@ def get_article_info(article, body = None, getAll=False):
   # phrases = []
   max_sum = []
   mmr = []
-  if allGrouped:
+  """ if allGrouped:
     kw_model = KeyBERT()
     max_sum = kw_model.extract_keywords(allGrouped, keyphrase_ngram_range=(2, 4), stop_words='english',use_maxsum=True, nr_candidates=20, top_n=15)
-    mmr = kw_model.extract_keywords(allGrouped, keyphrase_ngram_range=(2, 4), stop_words='english', use_mmr=True, nr_candidates=20, top_n=15)
+    mmr = kw_model.extract_keywords(allGrouped, keyphrase_ngram_range=(2, 4), stop_words='english', use_mmr=True, nr_candidates=20, top_n=15) """
     # r.extract_keywords_from_text(allGrouped)
 
     """ for rating, keyword in r.get_ranked_phrases_with_scores():
@@ -51,8 +50,8 @@ def get_article_info(article, body = None, getAll=False):
       'sorted_headings': sortedHeadings,
       'length': length,
       # 'joined': map(lambda pa: pa[1], sorted(list(set(phrases)), key=lambda x: x[0], reverse=True)) if allGrouped else 'Not an iterable',
-      'frequent_keywords_1': [row[0] for row in max_sum],
-      'frequent_keywords_2': [row[0] for row in mmr],
+      """ 'frequent_keywords_1': [row[0] for row in max_sum],
+      'frequent_keywords_2': [row[0] for row in mmr], """
       # 'allCombined': allGrouped
   }
 

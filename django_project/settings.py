@@ -64,10 +64,6 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    'https://ec2-13-53-129-232.eu-north-1.compute.amazonaws.com:3000',
-    'http://ec2-13-53-129-232.eu-north-1.compute.amazonaws.com:3000',
-    'https://ec2-13-53-129-232.eu-north-1.compute.amazonaws.com:6370',
-    'http://ec2-13-53-129-232.eu-north-1.compute.amazonaws.com:6370',
     'http://localhost:3000',
     'http://localhost:6370',
 ]

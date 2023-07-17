@@ -1,7 +1,6 @@
 import re
 from bs4 import BeautifulSoup
 import requests
-from keybert import KeyBERT
 
 import numpy as np
 import spacy
@@ -170,12 +169,12 @@ def get_post_info(url):
       word_count = len(content.text.split())
       word_count_with_headings = word_count + calculate_headings_length(soup) + (len(blog_title.split()) if blog_title else 0)
 
-      kw_model = KeyBERT()
+      """ kw_model = KeyBERT() """
       # frequent_kws = kw_model.extract_keywords(content.text, keyphrase_ngram_range=(1, 1), stop_words='english',use_maxsum=True, nr_candidates=30, top_n=20)
       # frequent_kws = kw_model.extract_keywords(content.text, keyphrase_ngram_range=(1, 3), stop_words='english', use_mmr=True, nr_candidates=5, top_n=10)
-      frequent_kws = kw_model.extract_keywords(content.text, keyphrase_ngram_range=(2, 3), stop_words='english', top_n=30, use_mmr=True)
+      """ frequent_kws = kw_model.extract_keywords(content.text, keyphrase_ngram_range=(2, 3), stop_words='english', top_n=30, use_mmr=True)
 
-      top_kws = sorted(frequent_kws, key=lambda x:x[1], reverse=True)
+      top_kws = sorted(frequent_kws, key=lambda x:x[1], reverse=True) """
       
       paragraphs = content.find_all('p')
       headings = content.find_all(['h1', 'h2', 'h3'])
@@ -242,7 +241,7 @@ def get_post_info(url):
           'headings_count': headings_count,
           'images_count': images_count,
           'links_count': links_count,
-          'frequent_keywords': [row[0] for row in top_kws],
+          """ 'frequent_keywords': [row[0] for row in top_kws], """
           "link": {
               "count": links_count,
               "internal": internal_links_count,
