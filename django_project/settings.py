@@ -27,7 +27,10 @@ SECRET_KEY = 'django-insecure-ssq7xa$%9uec*0n*946aump$mzqtzhcrp(@b$tfc=xax8jh$-p
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'ec2-16-170-202-188.eu-north-1.compute.amazonaws.com'
+    'ec2-16-170-202-188.eu-north-1.compute.amazonaws.com',
+    'ec2-16-171-154-210.eu-north-1.compute.amazonaws.com',
+    'jaspr.pages.dev',
+    '16.171.154.210'
 ]
 
 
@@ -68,6 +71,9 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://localhost:6370',
+    'https://jaspr.pages.dev',
+    'http://jaspr.pages.dev',
+    'https://16.171.154.210'
 ]
 
 ROOT_URLCONF = 'django_project.urls'
@@ -102,6 +108,9 @@ DATABASES = {
         'PASSWORD': 'postgres',
         'HOST': 'db',
         'PORT': 5432,
+        'OPTIONS': {
+            'connect_timeout': 30
+        }
     }
 }
 
