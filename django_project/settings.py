@@ -30,7 +30,7 @@ ALLOWED_HOSTS = [
     'ec2-16-170-202-188.eu-north-1.compute.amazonaws.com',
     'ec2-16-171-154-210.eu-north-1.compute.amazonaws.com',
     'jaspr.pages.dev',
-    '16.171.154.210'
+    '16.171.154.210',
     'localhost:8000',
     'localhost',
 ]
