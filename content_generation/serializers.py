@@ -52,6 +52,11 @@ class RecipeSerializer(serializers.ModelSerializer):
         model = Recipe
         fields = ('_id', 'name', 'body', 'created_at', 'last_used')
 
+class RecipeGetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Recipe
+        fields = ('__all__')
+
 
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:

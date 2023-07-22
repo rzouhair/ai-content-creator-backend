@@ -31,4 +31,7 @@ urlpatterns = [
 
   path('outputs/', views.outputActions, name='output-all'),
   path('outputs/<uuid:_id>/', views.outputActions, name='output-actions'),
+
+  path('recipes/', views.recipesActions, name='recipes-all'),
+  path('recipes/<uuid:_id>/', views.recipesActions, name='recipes-actions'),
 ]

@@ -31,6 +31,8 @@ ALLOWED_HOSTS = [
     'ec2-16-171-154-210.eu-north-1.compute.amazonaws.com',
     'jaspr.pages.dev',
     '16.171.154.210'
+    'localhost:8000',
+    'localhost',
 ]
 
 
@@ -70,6 +72,7 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
+    'http://localhost:8000',
     'http://localhost:6370',
     'https://jaspr.pages.dev',
     'http://jaspr.pages.dev',

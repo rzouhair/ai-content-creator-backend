@@ -1,7 +1,14 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+__pycache__
+content_generation/__pycache__/*
+django_project/__pycache__/*
+keywordresearch/__pycache__/*
+api/__pycache__/
+core/__pycache__/
 *.py[cod]
-
+**/__pycache__/*
+**/*.py[cod]
 # C extensions
 *.so
 

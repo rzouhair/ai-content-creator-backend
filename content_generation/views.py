@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404, render
-from content_generation.models import Document, Output, Project, Prompt, Skill, Tag
-from content_generation.serializers import DocumentGetSerializer, DocumentSerializer, OutputSerializer, ProjectSerializer, PromptSerializer, SkillGetSerializer, SkillSerializer, TagSerializer
+from content_generation.models import Document, Output, Project, Prompt, Skill, Tag, Recipe
+from content_generation.serializers import DocumentGetSerializer, DocumentSerializer, OutputSerializer, ProjectSerializer, PromptSerializer, SkillGetSerializer, SkillSerializer, TagSerializer, RecipeSerializer, RecipeGetSerializer
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
@@ -388,3 +388,43 @@ def getCompletion(request):
   ])
 
   return Response(chat_resp)
+
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+def recipesActions(request, _id=None): 
+    if request.method == 'GET':
+        if _id is not None:
+            recipe = get_object_or_404(Recipe, _id=_id)
+            serializer = RecipeSerializer(recipe)
+            return Response(serializer.data)
+        else:
+            suggestions = Recipe.objects.all()
+            serializer = RecipeGetSerializer(suggestions, many=True)
+            return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        print(str(request.data))
+        serializer = RecipeSerializer(data=request.data)
+        if serializer.is_valid():
+          serializer.save()
+          return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        recipe = Recipe.objects.get(_id=_id)
+    except Recipe.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'PUT':
+        serializer = RecipeSerializer(recipe, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+      """ if _id == None:
+        Skill.objects.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+      else: """
+      recipe.delete()
+      return Response(status=status.HTTP_204_NO_CONTENT)
