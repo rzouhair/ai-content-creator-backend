@@ -17,6 +17,9 @@ urlpatterns = [
 
   path('execute/', views.execute, name='execute'),
 
+  path('extract/', views.extractFromVideo, name='extract'),
+  path('extract/analyze/', views.extractSummaryFromTranscript, name='extract-analyze'),
+
   path('documents/', views.documentActions, name='document-all'),
   path('documents/<uuid:_id>/', views.documentActions, name='document-actions'),
 

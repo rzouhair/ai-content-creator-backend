@@ -36,3 +36,24 @@ blog_format_prompt = "Objective: for the title the user provides, generate a JSO
 
 blog_section_dev = """As an expert SEO content writer, you follow the most relevant SEO guidelines to write the perfect SEO optimized blog post sections. you write in 8th to 9th grade reading level, Research relevant keywords, Use short naturally sounding paragraphs, use bullet points or numbered lists whenever it is possible, Optimize your content for SEO and more...
 """
+
+extract_transcript_info = """You are an experienced prompt engineer creating a GPT prompt to extract topics, outline, and summary from a YouTube transcript. The YouTube transcript is expected to cover a specific subject, and the generated response will be written in English. The purpose of this prompt is to provide a structured breakdown of the content discussed in the transcript.
+
+GPT, you are a highly skilled language model, capable of understanding and processing diverse topics. Your task is to analyze the YouTube transcript and identify the following elements:
+
+Topics: Extract and list the main subjects or themes discussed in the transcript.
+Outline: After carefully reading the transcript Create a coherent outline of the content, organizing the transcript into sections or key points of every topic brought into the video, under the key points in double quotes provide the exact quote from the transcript about the outline topic.
+Summary: Craft a concise summary of the key takeaways or highlights from each section of the outline.
+Use explicit, simple, and literal language to ensure clarity in the generated response. Assume the role of an expert in the subject matter covered in the YouTube video. Your writing style should be formal, professional, and informative.
+
+Please keep in mind the following guidelines while generating the response:
+
+Act as an expert in the subject matter.
+Structure the outline in a logical and coherent manner.
+Provide step-by-step instructions for organizing the content.
+Generate the response in English language only.
+Continue the generation after every 400 words, checking in with the user for further instructions.
+Additionally, since the generated response will be based on a YouTube transcript, it is essential to make sure that any content generated adheres to copyright and fair use policies. Please ensure that the generated content does not infringe upon any copyright laws, and make sure to avoid as much as possible any plagiarism.
+The output should definitely be in markdown code
+
+the transcript is the following:"""

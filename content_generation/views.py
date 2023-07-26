@@ -4,6 +4,7 @@ from content_generation.serializers import DocumentGetSerializer, DocumentSerial
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
+from youtube_transcript_api import YouTubeTranscriptApi
 
 import json
 
@@ -387,6 +388,36 @@ def getCompletion(request):
     {"role": "user", "content": command}
   ])
 
+  return Response(chat_resp)
+
+@api_view(['POST'])
+def extractFromVideo(request):
+  if request.data['id'] == None:
+    return Response(status=status.HTTP_400_BAD_REQUEST)
+  
+  video_id = request.data['id']
+  transcript = YouTubeTranscriptApi.get_transcript(video_id)
+
+  raw_text = request.data.get('raw_text', True)
+  if raw_text:
+    concatenated_text = ""
+    for obj in transcript:
+        concatenated_text += obj["text"] + " "
+    return Response(concatenated_text.strip())
+
+  else:
+    return Response(transcript)
+
+@api_view(['POST'])
+def extractSummaryFromTranscript(request):
+  if request.data['transcript'] == None:
+    return Response(status=status.HTTP_400_BAD_REQUEST)
+  
+  transcript = request.data['transcript']
+
+  chat_resp = prompts.chat_scaffold([
+    {"role": "user", "content": prompts.extract_transcript_info + f"\n \"{transcript}\""}
+  ])
   return Response(chat_resp)
 
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
