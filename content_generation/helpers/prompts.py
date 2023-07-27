@@ -2,7 +2,7 @@ import openai
 import json
 
 # sk-THOWTtzJ1MmxKZkswur5T3BlbkFJyhkR1IfLQVPTiqMm38R
-openai.api_key = "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"
+openai.api_key = "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"
 
 
 def chat_scaffold(messages):
