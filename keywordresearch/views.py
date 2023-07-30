@@ -7,6 +7,7 @@ from keywordresearch.tasks import analyze_search_results
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
+from duckduckgo_search import DDGS
 
 import json
 
@@ -73,7 +74,26 @@ def getSuggestions(request):
     
     response = response[4:]  # remove the first 4 characters ")]}'"
     data = json.loads(response)
-    return Response(map(lambda q: q[0] if with_styling else q[0].replace('<b>', '').replace('</b>', ''), data[0]))
+
+    bing_url = f"https://www.bing.com/AS/Suggestions?mkt=en-us&qry={query}&cp=10&cvid=6E3353AA20CE4BDFA6634D8441275B34"
+    bing_html_response = get_html_content(bing_url, headers=headers)
+
+    bing_html_unescaped = unescape_html(bing_html_response)
+
+    bing_soup = BeautifulSoup(bing_html_unescaped, 'html.parser')
+
+    bing_options = bing_soup.select('li.sa_sg[role="option"]')
+
+    ddg_options = []
+    with DDGS() as ddgs:
+        for r in ddgs.suggestions(query):
+            ddg_options.append(r["phrase"])
+
+    return Response({
+        "bing": map(lambda q: q["query"], bing_options),
+        "google": map(lambda q: q[0] if with_styling else q[0].replace('<b>', '').replace('</b>', ''), data[0]),
+        "ddg": ddg_options
+    })
 
 
 @api_view(['GET', 'POST'])
