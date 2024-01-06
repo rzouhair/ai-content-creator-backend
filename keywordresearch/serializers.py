@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Search, Article, Suggestion
+from .models import Search, Article, Suggestion, Keywords
 
 class SearchSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,6 +18,16 @@ class SuggestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Suggestion
         fields = ['_id', 'parent_keyword', 'status', 'search_query', 'project', 'created_at']
+
+class KeywordsSerializerWithEmbedding(serializers.ModelSerializer):
+    class Meta:
+        model = Keywords
+        fields = ['_id', 'title', 'suggestion', 'saved_cluster', 'embeddings', 'created_at']
+
+class KeywordsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Keywords
+        fields = ['_id', 'title', 'suggestion', 'saved_cluster', 'created_at']
 
 class SearchGetSerializer(serializers.ModelSerializer):
     related_suggestion_id = SuggestionSerializer(many=False)    

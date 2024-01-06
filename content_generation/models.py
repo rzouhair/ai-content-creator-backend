@@ -1,6 +1,7 @@
 import uuid
 from django.db import IntegrityError, models
 from django.contrib.postgres.fields import ArrayField
+from app_auth.models import User
 
 # Create your models here.
 class Tag(models.Model):
@@ -45,6 +46,7 @@ class Prompt(models.Model):
 
 class Output(models.Model):
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
     text = models.TextField()
     completionId = models.CharField(max_length=255, blank=True, default=None)
     usage = models.JSONField()
@@ -61,6 +63,7 @@ class Output(models.Model):
 
 class Project(models.Model):
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
     name = models.CharField(max_length=255, blank=True, default=None, unique=True)
     description = models.TextField(blank=True, default="-")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -75,6 +78,7 @@ class Project(models.Model):
 class Document(models.Model):
 
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
     content = models.TextField()
     delta = models.JSONField(blank=True, default=dict)
     name = models.CharField(max_length=255, blank=True, default=None, unique=True)
@@ -93,6 +97,7 @@ class Document(models.Model):
 
 class Recipe(models.Model):
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
     name = models.TextField(unique=True)
     body = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

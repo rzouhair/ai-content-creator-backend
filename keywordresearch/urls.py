@@ -15,4 +15,7 @@ urlpatterns = [
     path('searches/<uuid:_id>/', views.searchActions, name='search-actions'),
     path('analyze-query/', views.google_search, name='google-actions'),
     path('analyze-post/', views.wordpress_post, name='wp-actions'),
+    path('keywords/', views.keywordsActions, name='keywords-all'),
+    path('keywords/<uuid:_id>/', views.keywordsActions, name='keywords-actions'),
+    path('keywords/<uuid:_id>/cluster', views.clusterKeywords, name='keywords-clustering'),
 ]

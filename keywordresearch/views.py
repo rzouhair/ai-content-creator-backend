@@ -9,6 +9,8 @@ from rest_framework.decorators import api_view
 from rest_framework import status
 from duckduckgo_search import DDGS
 
+from core.helpers import cluster_keywords
+
 import json
 
 import nltk
@@ -17,13 +19,14 @@ from rake_nltk import Rake, Metric
 
 from bs4 import BeautifulSoup
 
+from .helpers import prompts
+
 from core.helpers import get_html_content, unescape_html, get_response_content
-from .helpers.cluster_keywords import cluster_keywords
 from .helpers.get_article_info import get_article_info
 from .helpers.search_results import get_search_query_html, get_organic_search_results, get_keyword_questions, merge_questions
 
-from .models import Search, Suggestion
-from .serializers import SearchGetSerializer, SearchSerializer, SuggestionSerializer
+from .models import Search, Suggestion, Keywords
+from .serializers import SearchGetSerializer, SearchSerializer, SuggestionSerializer, KeywordsSerializer, KeywordsSerializerWithEmbedding
 
 @api_view(['GET', 'POST'])
 def analyzeKeyword(request):
@@ -60,10 +63,32 @@ def getSerpResults(request):
 def getSuggestions(request):
     # base_url = "https://suggestqueries.google.com/complete/search?client=firefox&q="
     query = request.data.get('query', None)
+    country = request.data.get('country', 'us')
+
+    country_lang = {
+        'us': {
+            "country": 'us',
+            "lang": 'en-us'
+        },
+        'fr': {
+            "country": 'fr',
+            "lang": 'fr'
+        },
+        'es': {
+            "country": 'es',
+            "lang": 'es'
+        },
+        'ma': {
+            "country": 'ma',
+            "lang": 'fr'
+        },
+    }
+
     with_styling = request.data.get('with_styling', False)
     if not query:
         return Response('No query provided')
-    base_url = f"https://www.google.com/complete/search?q={query}&gl=us&cp=4&client=gws-wiz-serp&xssi=t&authuser=0&psi=bVUaZPSOEtCtkdUPoNa0-Ag.1679447406374&dpr=2"
+
+    base_url = f"https://www.google.com/complete/search?q={query}&gl={country_lang[country].get('country')}&cp=4&client=gws-wiz-serp&xssi=t&authuser=0&psi=bVUaZPSOEtCtkdUPoNa0-Ag.1679447406374&dpr=2"
 
     USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
     headers = {"user-agent": USER_AGENT} 
@@ -71,11 +96,12 @@ def getSuggestions(request):
     url = base_url
 
     response = get_response_content(url, headers=headers)
+    print(response)
     
     response = response[4:]  # remove the first 4 characters ")]}'"
     data = json.loads(response)
 
-    bing_url = f"https://www.bing.com/AS/Suggestions?mkt=en-us&qry={query}&cp=10&cvid=6E3353AA20CE4BDFA6634D8441275B34"
+    bing_url = f"https://www.bing.com/AS/Suggestions?mkt={country_lang[country].get('lang')}&qry={query}&cp=10&cvid=6E3353AA20CE4BDFA6634D8441275B34"
     bing_html_response = get_html_content(bing_url, headers=headers)
 
     bing_html_unescaped = unescape_html(bing_html_response)
@@ -188,6 +214,7 @@ def suggestionsActions(request, _id=None):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        print(_id)
         suggestion = Suggestion.objects.get(_id=_id)
     except Suggestion.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
@@ -442,3 +469,72 @@ def wordpress_post(request):
     post_info = get_post_info(request.query_params.get('url'))
     # Return the post information as a JSON response
     return Response({ "post_info": post_info })
+
+@api_view(['POST'])
+def clusterKeywords(request, _id=None):
+    clusters_count = request.data["cluster_count"]
+    keywordsList = get_object_or_404(Keywords, _id=_id)
+    serializer = KeywordsSerializer(keywordsList)
+
+    """ for keyword in request.data["keywords"]:
+        embedding = prompts.embedding_scaffold(keyword)
+        embeddedKeywords["embeddings"].append({
+            "keyword": keyword,
+            "embedding": embedding
+        }) """
+
+    clustered_keywords = cluster_keywords(serializer.data, clusters_count)
+    serializer = KeywordsSerializer(keywordsList, data={ "saved_cluster": clustered_keywords })
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    print("Not valid")
+    return Response(serializer.data)
+
+
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+def keywordsActions(request, _id=None):
+    if request.method == 'GET':
+        if _id is not None:
+            keywordsList = get_object_or_404(Keywords, _id=_id)
+            serializer = KeywordsSerializer(keywordsList)
+            return Response(serializer.data)
+        else:
+            keywords = Keywords.objects.all()
+            serializer = KeywordsSerializer(keywords, many=True)
+            return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        embeddedKeywords = {
+            "title": request.data.get("title", None),
+            "suggestion": request.data.get("suggestion", None),
+        }
+        """ for keyword in request.data["keywords"]:
+            embedding = prompts.embedding_scaffold(keyword)
+            embeddedKeywords["embeddings"].append({
+                "keyword": keyword,
+                "embedding": embedding
+            }) """
+        serializer = KeywordsSerializer(data=embeddedKeywords)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(request.data.get("title"), status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        keywordsList = Keywords.objects.get(_id=_id)
+    except Keywords.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'PUT':
+        serializer = KeywordsSerializer(keywordsList, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        keywordsList.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+

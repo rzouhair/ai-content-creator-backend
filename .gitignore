@@ -9,8 +9,12 @@ core/__pycache__/
 *.py[cod]
 **/__pycache__/*
 **/*.py[cod]
+*.pyc
+**/*.pyc
 # C extensions
 *.so
+
+dump_*.sql
 
 # Distribution / packaging
 bin/

@@ -15,9 +15,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from nltk.probability import FreqDist
 
 
-nltk.download('punkt')
+""" nltk.download('punkt')
 nltk.download('stopwords')
-nltk.download('wordnet')
+nltk.download('wordnet') """
 
 
 def get_article_data(art, body):

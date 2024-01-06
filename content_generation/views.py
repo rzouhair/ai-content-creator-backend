@@ -169,17 +169,33 @@ def skillsActions(request, _id=None):
             serializer = SkillGetSerializer(skill)
             return Response(serializer.data)
         else:
-            suggestions = Skill.objects.all()
-            serializer = SkillGetSerializer(suggestions, many=True)
+            skills = Skill.objects.all()
+            serializer = SkillGetSerializer(skills, many=True)
             return Response(serializer.data)
-    
+
     elif request.method == 'POST':
-        print(str(request.data))
-        serializer = SkillSerializer(data=request.data)
-        if serializer.is_valid():
-          serializer.save()
-          return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+      if isinstance(request.data, dict):
+          # If the request data is a single skill object, serialize and save it
+          serializer = SkillSerializer(data=request.data)
+          if serializer.is_valid():
+              serializer.save()
+              return Response(serializer.data, status=status.HTTP_201_CREATED)
+      elif isinstance(request.data, list):
+          # If the request data is a list of skills, serialize and save each skill
+          serialized_skills = []
+          for skill_data in request.data:
+              serializer = SkillSerializer(data=skill_data)
+              if serializer.is_valid():
+                  serializer.save()
+                  serialized_skills.append(serializer.data)
+              else:
+                  # If any skill data is invalid, return a 400 Bad Request response
+                  return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+          # Return a response with the serialized skills and a 201 Created status
+          return Response(serialized_skills, status=status.HTTP_201_CREATED)
+      # If the request data is neither a list nor a single skill object, return a 400 Bad Request
+      return Response({'error': f'Invalid data format - {type(request.data)} - {isinstance(request.data, dict)}'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         skill = Skill.objects.get(_id=_id)
@@ -240,6 +256,7 @@ def documentActions(request, _id=None):
 
     try:
         document = Document.objects.get(_id=_id)
+        print(document)
     except Document.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 

@@ -2,12 +2,21 @@ import openai
 import json
 
 # sk-THOWTtzJ1MmxKZkswur5T3BlbkFJyhkR1IfLQVPTiqMm38R
-openai.api_key = "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"
+openai.api_key = "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"
+GPT_MODEL='gpt-3.5-turbo-1106'
+EMBEDDING_MODEL="text-embedding-ada-002"
 
+def embedding_scaffold(input):
+  response = openai.Embedding.create(
+    input=input,
+    model=EMBEDDING_MODEL
+  )
+
+  return response.data[0].embedding
 
 def chat_scaffold(messages):
   resp = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo",
+    model=GPT_MODEL,
     messages=messages
   )
 

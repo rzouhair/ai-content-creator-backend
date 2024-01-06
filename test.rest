@@ -1,0 +1,44 @@
+POST http://127.0.0.1:8000/api/signup 
+Content-Type: application/json
+
+{ "password": "Pass1234!", "email": "adam6@mail.com" }
+
+###
+
+POST http://127.0.0.1:8000/api/login 
+Content-Type: application/json
+
+{ "email": "adam2@mail.com", "password": "Pass1234!" }
+
+###
+
+POST http://127.0.0.1:8000/api/test_token 
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzA0NDk3MjQ0LCJpYXQiOjE3MDQ0OTM2NDQsImp0aSI6IjBmZjlhZDgzNjliNzRiMGFhNGQ2ZWZiMmYyY2EwZDk1IiwidXNlcl9pZCI6N30.2uLTj7CXbEe29Q_6C1OGQUubp4f_8DrAbU2Q02i5Jsg
+
+###
+
+POST http://127.0.0.1:8000/api/token/verify/
+Content-Type: application/json
+
+{ "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzA0NTA3NTA5LCJpYXQiOjE3MDQ1MDM5MDksImp0aSI6IjU5OWVmMmVhZmU1NjRhZDViNDIyMmNjZThiMjRhMjhkIiwidXNlcl9pZCI6MTN9.B8uhdJ7bqL0v2_CwCQiavzk1bmQ618QX3ac7DlqW7X0d" }
+
+###
+
+POST http://127.0.0.1:8000/api/token/refresh/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzA0NDk3MjQ0LCJpYXQiOjE3MDQ0OTM2NDQsImp0aSI6IjBmZjlhZDgzNjliNzRiMGFhNGQ2ZWZiMmYyY2EwZDk1IiwidXNlcl9pZCI6N30.2uLTj7CXbEe29Q_6C1OGQUubp4f_8DrAbU2Q02i5Jsg
+
+{ "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTcwNDY2ODk4OCwiaWF0IjoxNzA0NDk2MTg4LCJqdGkiOiI0OWNlMmY0ZjA5MzA0NTVmYmQ3MTY2ZTg2YzcyMzAwZiIsInVzZXJfaWQiOjEwfQ.Gf-0pKaKhS1trVeo-hmfuxMg4zr0AEqlaz740qWXjp4" }
+
+###
+
+GET http://127.0.0.1:8000/api/users
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzA0NDk3MjQ0LCJpYXQiOjE3MDQ0OTM2NDQsImp0aSI6IjBmZjlhZDgzNjliNzRiMGFhNGQ2ZWZiMmYyY2EwZDk1IiwidXNlcl9pZCI6N30.2uLTj7CXbEe29Q_6C1OGQUubp4f_8DrAbU2Q02i5Jsg
+
+###
+
+GET http://127.0.0.1:8000/api/users/477884e4-4529-419e-bf6e-9ece0995186b
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzA0NDk3MjQ0LCJpYXQiOjE3MDQ0OTM2NDQsImp0aSI6IjBmZjlhZDgzNjliNzRiMGFhNGQ2ZWZiMmYyY2EwZDk1IiwidXNlcl9pZCI6N30.2uLTj7CXbEe29Q_6C1OGQUubp4f_8DrAbU2Q02i5Jsg
