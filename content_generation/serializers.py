@@ -1,7 +1,7 @@
 from django.db import IntegrityError
 from keywordresearch.serializers import SuggestionSerializer
 from rest_framework import serializers
-from .models import Document, Output, Project, Prompt, Recipe, Skill, Tag
+from .models import Document, Memory, Output, Project, Prompt, Recipe, Skill, Tag
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -11,7 +11,7 @@ class TagSerializer(serializers.ModelSerializer):
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
-        fields = ('_id', 'name', 'description', 'created_at', 'updated_at')
+        fields = ('_id', 'name', 'user', 'description', 'created_at', 'updated_at')
 
 
 class SkillGetSerializer(serializers.ModelSerializer):
@@ -33,13 +33,17 @@ class SkillSerializer(serializers.ModelSerializer):
         model = Skill
         fields = ('__all__')
 
-
 class PromptSerializer(serializers.ModelSerializer):
     skill = serializers.PrimaryKeyRelatedField(queryset=Skill.objects.all(), many=False)
     
     class Meta:
         model = Prompt
         fields = ('_id', 'prompt', 'skill')
+
+class MemorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Memory
+        fields = ('_id', 'user', 'name', 'type', 'metadata', 'status', 'created_at', 'updated_at')
 
 
 class OutputSerializer(serializers.ModelSerializer):
@@ -50,7 +54,7 @@ class OutputSerializer(serializers.ModelSerializer):
 class RecipeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
-        fields = ('_id', 'name', 'body', 'created_at', 'last_used')
+        fields = ('_id', 'name', 'user', 'body', 'created_at', 'last_used')
 
 class RecipeGetSerializer(serializers.ModelSerializer):
     class Meta:

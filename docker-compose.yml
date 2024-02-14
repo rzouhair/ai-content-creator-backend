@@ -16,6 +16,10 @@ services:
     depends_on:
       - db
       - redis
+    networks:
+      - seotool-network
+
+
   celery:
       build: .
       command: celery -A django_project worker -l INFO
@@ -29,17 +33,42 @@ services:
       depends_on:
           - web
           - redis  
+      networks:
+      - seotool-network
+
+
   db:
     image: postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: django_project
+    networks:
+      - seotool-network
   
   redis:
     image: "redis:alpine"
+    networks:
+      - seotool-network
     ports:
       - "6379:6379"
 
+  typesense:
+    container_name: typesense
+    image: typesense/typesense:0.25.1
+    ports:
+      - target: 8108
+        published: 8108
+        mode: host
+    volumes:
+      - vector-data:/data-seo
+    command: '--data-dir /data-seo --api-key=xyz --enable-cors'
+    networks:
+      - seotool-network
+
+networks:
+  seotool-network:
+
 volumes:
   pgdata:
+  vector-data:

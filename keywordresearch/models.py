@@ -8,10 +8,11 @@ class Suggestion(models.Model):
     from content_generation.models import Project
 
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="id", db_column="user_id")
     parent_keyword = models.CharField(max_length=255)
     search_query = models.CharField(max_length=255, default="")
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
+    metadata = models.JSONField(default=dict)
     status = models.CharField(max_length=255, default="CREATED")
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -24,7 +25,7 @@ class Suggestion(models.Model):
 
 class Search(models.Model):
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="id", db_column="user_id")
     related_suggestion_id = models.ForeignKey(Suggestion, on_delete=models.CASCADE, null=True)
     serps = models.JSONField(default=dict)
     questions = models.JSONField(default=dict)
@@ -38,9 +39,9 @@ class Search(models.Model):
 
 class Keywords(models.Model):
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="id", db_column="user_id")
     title = models.CharField(max_length=255, default="Keywords List")
-    suggestion = models.ManyToManyField(Suggestion, null=True, default=None)
+    suggestions = models.ManyToManyField(Suggestion, null=True, default=None)
     saved_cluster = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -52,7 +53,7 @@ class Keywords(models.Model):
 
 class Article(models.Model):
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="id", db_column="user_id")
     title = models.CharField(max_length=255)
     meta_description = models.CharField(max_length=255)
     article_content = models.TextField()

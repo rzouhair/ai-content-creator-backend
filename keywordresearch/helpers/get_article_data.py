@@ -3,7 +3,6 @@ from bs4 import BeautifulSoup
 import requests
 
 import numpy as np
-import spacy
 import nltk
 from nltk.corpus import stopwords
 from rake_nltk import Rake, Metric

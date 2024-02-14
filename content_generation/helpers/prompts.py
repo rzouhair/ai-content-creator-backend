@@ -3,7 +3,7 @@ import json
 
 # sk-THOWTtzJ1MmxKZkswur5T3BlbkFJyhkR1IfLQVPTiqMm38R
 openai.api_key = "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"
-GPT_MODEL='gpt-3.5-turbo-1106'
+GPT_MODEL='gpt-3.5-turbo-0125'
 EMBEDDING_MODEL="text-embedding-ada-002"
 
 def embedding_scaffold(input):
@@ -32,6 +32,129 @@ def chat_scaffold(messages):
       'usage': resp['usage'],
       "content": content
     }
+
+def detect_search_intent(keyword):
+  return chat_scaffold([
+    { 'role': 'system', 'content': """
+# What Is Search Intent?
+
+Search intent (also known as user intent) is the reason why a user types a particular query into a search engine. It represents what the user is trying to achieve with their search, whether that's finding an answer to a question, looking for a specific website, purchasing a product, or exploring a topic.
+
+Keyword intent or keyword search intent is the same thing as search intent. It basically means the search intent behind a specific keyword. Some keywords may have a clear intent, while some intent may not be obvious from the keyword. We call this a “mixed intent.”
+
+A common example of a mixed intent is a search term that is the name of a specific product—like “iphone 13 pro max.”
+
+Since it’s unclear whether a user’s intent is transactional, commercial, or informational, the Google search results will include various types of results and SERP features to make sure they meet different search needs.
+
+Let's say someone searches for “best dog food” on Google.
+
+They're not trying to navigate to a specific page. And they don't want to buy a specific product either. (At least not yet.)
+
+They want to do their research before making a purchase.
+
+That means the keyword has commercial intent. And we can use this knowledge to adjust our content to target this keyword better.
+
+## The Four Types of Search Intent
+
+We usually distinguish between four types of search intent:
+
+1. **Navigational Intent:**
+   - Users want to find a specific page (e.g., “reddit login”)
+
+   Examples:
+   - starbucks
+   - gmail login
+   - semrush keyword magic tool
+   - ikea refund policy
+
+   Navigational keywords are often branded, ensuring easy access for the target audience.
+
+2. **Informational Intent:**
+   - Users want to learn more about something (e.g., “what is seo”)
+
+   Examples:
+   - bruce willis movies
+   - what is seo
+   - california time now
+   - how to clean a dishwasher
+
+   Informational queries make up a significant number of searches, often addressed with blog posts.
+
+   - Benefits:
+     - Visibility
+     - Building trust
+     - Targeting new leads
+
+3. **Commercial Intent:**
+   - Users want to do research before making a purchase decision (e.g., “best coffee maker”)
+
+   Examples:
+   - best indoor plants for low light
+   - apple watch ultra review
+   - mailchimp alternatives
+   - hbo max vs netflix
+
+   Commercial queries lie between informational and transactional intent.
+
+4. **Transactional Intent:**
+   - Users want to complete a specific action, usually a purchase (e.g., “buy subaru forester”)
+
+   Examples:
+   - iphone 13 pro max price
+   - personality test online
+   - semrush trial
+   - watch friends
+
+   Transactional keywords are crucial for conversions.
+
+## How to Determine Search Intent
+
+Search intent often aligns with where users are in the marketing funnel:
+
+- **Awareness:** User searches for informational keywords like “how to do keyword research”
+- **Consideration:** User searches for commercial keywords like “best keyword research tools”
+- **Conversion:** User searches for transactional or navigational keywords like “Semrush plans”
+
+Determining search intent is a crucial step in any content strategy. Tools like Semrush can automatically calculate search intent for every keyword.
+
+To find the “Intent” metric in Keyword Overview:
+
+- The calculation is based on the words within the keyword phrase and the SERP features present in the search results.
+
+## How Many Types of Search Intent Are There?
+
+The most common intent categorization includes four types of search intent: navigational, informational, commercial, and transactional.
+
+Google uses a slightly different categorization in their Search Quality Evaluator Guidelines, distinguishing between:
+
+- “Know” queries: Users want information (corresponds to informational intent)
+- “Do” queries: Users want to do something (corresponds to transactional intent)
+- “Website” queries: Users want to visit a specific website (corresponds to navigational intent)
+- “Visit-in-person” queries: Users want to visit a specific physical place
+
+""" },
+    { 'role': 'user', 'content': f"""
+Your task is to determine the search intent associated with a given keyword or search query. You'll be provided with a string, including the keyword or query, as an input. You need to analyze the given string and determine which of the four types of search intent it belongs to. The types of search intent are: 
+
+1. Navigational intent: The user is trying to find a specific page (e.g., branded keywords, specific tool or page names)
+2. Informational intent: The user wants to learn more about a subject (e.g., questions or queries involving who, what, where, why, or how)
+3. Commercial intent: The user is doing research before making a purchase decision (e.g., searches involving best, review, comparison, etc.)
+4. Transactional intent: The user wants to complete a specific action, which could be purchasing a product, subscribing to a service, or downloading a software/tool (e.g., queries containing specific product names, price, online tests, or trial)
+
+The output should be a single string, stating the category of search intent like "Navigational", "Informational", "Commercial", or "Transactional". It's critical you make this decision based on the defined categories and the nature of the input keyword.
+
+Avoid repetitive or monotonous responses, and incorporate intricate mechanisms such as checking for specific words, prefixes, or patterns associated with each type of intent. Be cautious not to generate irrelevant or inappropriate responses, as this could lead to a poor user experience. 
+
+Remember, the goal is to as accurately as possible determine the search intent. You are not just generating text, but analyzing and categorizing the input based on the provided definitions.
+
+Please return only the search intent word, nothing else, no fluff, introduction, conversational fluff, nothing, only the search intent
+
+The Keyword Input:
+{keyword}
+
+The Search Intent:
+""" }
+  ])
 
 title_system_prompt = "You are title generator, you help the user create catchy, relevant titles that can improve click-through rates and enhance website rankings, you only return a plain JSON array containing the number of titles the user requested, not an object, an array .When generating your response, please focus solely on providing relevant and informative content that directly answers the prompt. Please refrain from using affirmative language or providing irrelevant information that does not directly address the prompt."
 

@@ -12,6 +12,7 @@ urlpatterns = [
   path('skills/', views.skillsActions, name='skills-all'),
   path('skills/<uuid:_id>/', views.skillsActions, name='skills-actions'),
   path('skills/<uuid:_id>/outputs/', views.skillOutputs, name='skills-actions'),
+  path('skills/<uuid:_id>/prompt/', views.skillPrompt, name='skills-prompt'),
 
   path('completion/', views.getCompletion, name='get-completion'),
 
@@ -25,6 +26,9 @@ urlpatterns = [
 
   path('projects/', views.projectActions, name='project-all'),
   path('projects/<uuid:_id>/', views.projectActions, name='project-actions'),
+
+  path('memories/', views.memoryActions, name='memory-all'),
+  path('memories/<uuid:_id>/', views.memoryActions, name='memory-actions'),
 
   path('prompts/', views.promptActions, name='prompts-all'),
   path('prompts/<uuid:_id>/', views.promptActions, name='prompts-actions'),

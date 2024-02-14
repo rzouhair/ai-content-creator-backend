@@ -16,6 +16,12 @@ urlpatterns = [
     path('analyze-query/', views.google_search, name='google-actions'),
     path('analyze-post/', views.wordpress_post, name='wp-actions'),
     path('keywords/', views.keywordsActions, name='keywords-all'),
+
+    path('keywords/<uuid:_id>/suggestions/', views.get_keywords_list_suggestions, name='keywords-suggestions'),
     path('keywords/<uuid:_id>/', views.keywordsActions, name='keywords-actions'),
-    path('keywords/<uuid:_id>/cluster', views.clusterKeywords, name='keywords-clustering'),
+    path('keywords/<uuid:_id>/cluster/', views.keywordClustering, name='keywords-clustering'),
+
+    path('ideation/autocomplete/', views.autocomplete, name="ideation-autocomplete"),
+    path('ideation/alphabet/', views.alphabet_soup, name="ideation-alphabet_soup"),
+    path('ideation/query/', views.query_generation, name="ideation-query-generation")
 ]

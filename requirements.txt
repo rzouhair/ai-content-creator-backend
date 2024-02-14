@@ -16,4 +16,12 @@ channels==4.0.0
 youtube-transcript-api==0.6.1
 duckduckgo_search===3.8.4
 pandas
+python-dotenv
+langchain
+boto3
+unstructured==0.7.12
+unstructured-inference
+pytesseract
+psycopg2-binary
+typesense==0.19.0
 djangorestframework-simplejwt==5.3.1

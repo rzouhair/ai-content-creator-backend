@@ -1,4 +1,3 @@
-from django.shortcuts import render
 
 # Create your views here.
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -7,12 +6,15 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from .models import User
+from .helpers import get_user_from_token, user_permissions
 from rest_framework.authtoken.models import Token
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import UserSerializer
+from core.helpers import manual_pagination
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -42,6 +44,13 @@ def login(request):
     return Response({'token': str(refresh.access_token), 'refresh': str(refresh), 'user': serializer.data})
 
 @api_view(['GET'])
+def me(request):
+    user = get_user_from_token(request)
+    if not user:
+        return Response("Please try logging in again", status=status.HTTP_404_NOT_FOUND)
+    return JsonResponse(user)
+
+@api_view(['GET'])
 @authentication_classes([SessionAuthentication, TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def test_token(request):
@@ -52,13 +61,13 @@ def test_token(request):
 def userActions(request, _id=None):
     if request.method == 'GET':
         if _id is not None:
-            user = get_object_or_404(User, _id=_id)
+            user = get_object_or_404(User, id=_id)
             serializer = UserSerializer(user)
             return Response(serializer.data)
         else:
             users = User.objects.all()
-            serializer = UserSerializer(users, many=True)
-            return Response(serializer.data)
+            data = manual_pagination(users, UserSerializer, request)
+            return JsonResponse(data)
     
     elif request.method == 'POST':
         print(str(request.data))
@@ -69,7 +78,7 @@ def userActions(request, _id=None):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        user = User.objects.get(_id=_id)
+        user = User.objects.get(id=_id)
     except User.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 

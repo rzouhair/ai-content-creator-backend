@@ -1,17 +1,30 @@
 import copy
 import re
+import json
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 import requests
+from app_auth.helpers import get_user_from_token
 from keywordresearch.helpers.get_article_data import get_article_content, get_post_info
+from keywordresearch.helpers.ideation import alphabet_soup_method, autocomplete_suggestions, create_ideation_keywords_list, query_generation_method
 from keywordresearch.tasks import analyze_search_results
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
 from rest_framework import status
+from rest_framework.decorators import api_view
 from duckduckgo_search import DDGS
+from app_auth.permissions import verify_auth
+from app_auth.models import User
+from core.helpers import manual_pagination, suggested_num_clusters
+from core.clients import create_document, delete_document, typesense_client, retrieve_documents, update_document
 
 from core.helpers import cluster_keywords
-
-import json
+from uuid import UUID
+class UUIDEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, UUID):
+            # if the obj is uuid, we simply return the value of uuid
+            return str(obj)
+        return json.JSONEncoder.default(self, obj)
 
 import nltk
 from nltk.corpus import stopwords
@@ -23,10 +36,10 @@ from .helpers import prompts
 
 from core.helpers import get_html_content, unescape_html, get_response_content
 from .helpers.get_article_info import get_article_info
-from .helpers.search_results import get_search_query_html, get_organic_search_results, get_keyword_questions, merge_questions
+from .helpers.search_results import get_bing_suggestions, get_google_suggestions, get_search_query_html, get_organic_search_results, get_keyword_questions, merge_questions
 
 from .models import Search, Suggestion, Keywords
-from .serializers import SearchGetSerializer, SearchSerializer, SuggestionSerializer, KeywordsSerializer, KeywordsSerializerWithEmbedding
+from .serializers import KeywordsPostSerializer, SearchGetSerializer, SearchSerializer, SuggestionSerializer, KeywordsSerializer, KeywordsSerializerWithEmbedding
 
 @api_view(['GET', 'POST'])
 def analyzeKeyword(request):
@@ -88,27 +101,8 @@ def getSuggestions(request):
     if not query:
         return Response('No query provided')
 
-    base_url = f"https://www.google.com/complete/search?q={query}&gl={country_lang[country].get('country')}&cp=4&client=gws-wiz-serp&xssi=t&authuser=0&psi=bVUaZPSOEtCtkdUPoNa0-Ag.1679447406374&dpr=2"
-
-    USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
-    headers = {"user-agent": USER_AGENT} 
-
-    url = base_url
-
-    response = get_response_content(url, headers=headers)
-    print(response)
-    
-    response = response[4:]  # remove the first 4 characters ")]}'"
-    data = json.loads(response)
-
-    bing_url = f"https://www.bing.com/AS/Suggestions?mkt={country_lang[country].get('lang')}&qry={query}&cp=10&cvid=6E3353AA20CE4BDFA6634D8441275B34"
-    bing_html_response = get_html_content(bing_url, headers=headers)
-
-    bing_html_unescaped = unescape_html(bing_html_response)
-
-    bing_soup = BeautifulSoup(bing_html_unescaped, 'html.parser')
-
-    bing_options = bing_soup.select('li.sa_sg[role="option"]')
+    google_suggestions = get_google_suggestions(query, country=country_lang[country].get('country'), with_styling=with_styling)
+    bing_options = get_bing_suggestions(query, country)
 
     ddg_options = []
     with DDGS() as ddgs:
@@ -117,7 +111,7 @@ def getSuggestions(request):
 
     return Response({
         "bing": map(lambda q: q["query"], bing_options),
-        "google": map(lambda q: q[0] if with_styling else q[0].replace('<b>', '').replace('</b>', ''), data[0]),
+        "google": google_suggestions,
         "ddg": ddg_options
     })
 
@@ -196,17 +190,19 @@ def getTopResultsKeywords(request):
 
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
 def suggestionsActions(request, _id=None):
+    user = get_user_from_token(request)
     if request.method == 'GET':
         if _id is not None:
             suggestion = get_object_or_404(Suggestion, _id=_id)
             serializer = SuggestionSerializer(suggestion)
             return Response(serializer.data)
         else:
-            suggestions = Suggestion.objects.all()
-            serializer = SuggestionSerializer(suggestions, many=True)
-            return Response(serializer.data)
+            suggestions = Suggestion.objects.filter(user=user['id'])
+            data = manual_pagination(suggestions, SuggestionSerializer, request)
+            return JsonResponse(data)
     
-    elif request.method == 'POST':
+    request.data['user'] = user['id']
+    if request.method == 'POST':
         serializer = SuggestionSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -269,28 +265,92 @@ def reanalyzeQuestions(request, _id):
 
 @api_view(['POST'])
 def analyze_suggestion(request, suggestion_id):
+    user = get_user_from_token(request)
     suggestion = Suggestion.objects.get(_id=suggestion_id)
     if suggestion.status == "IN_PROGRESS" or suggestion.status == 'ANALYZED':
         return Response("Suggestion analysis already started/finished", status=status.HTTP_400_BAD_REQUEST)
     suggestion.status = "IN_PROGRESS"
     suggestion.save()
+
+    if not user.get('id', None):
+        return Response(status=status.HTTP_401_UNAUTHORIZED)
     
-    analyze_search_results.delay(suggestion._id)
+    analyze_search_results.delay((suggestion._id, user.get('id', None)))
 
     serializer = SuggestionSerializer(suggestion)
     return Response(serializer.data)
 
 @api_view(['POST'])
-def keywordClustering(request):
-    keywords = request.data.get('keywords', None)
-    num_clusters = request.data.get('num_clusters', 3)
+def keywordClustering(request, _id=None):
 
-    if keywords == None:
-        return Response('No keywords provided', status=status.HTTP_400_BAD_REQUEST)
+    user = get_user_from_token(request)
 
-    clusters = cluster_keywords(keywords=keywords, num_clusters=num_clusters)
+    kw_list_id = _id
+    if (not kw_list_id):
+        return Response('No keywords list provided', status=status.HTTP_400_BAD_REQUEST)
+    keywords_list = Keywords.objects.get(_id=kw_list_id)
 
-    return Response(clusters)
+    kw_embedding = []
+    suggestions_query_set = keywords_list.suggestions.all()
+    serialized = SuggestionSerializer(suggestions_query_set, many=True)
+
+    newly_embedded = 0
+    for keyword in serialized.data:
+        filters = {
+            'q': '*',
+            'query_by': '*',
+            'filter_by': f"id:={str(keyword['_id'])}"
+        }
+        try:
+            is_keyword_embedded = retrieve_documents('keywords', filters)
+        except Exception as e:
+            is_keyword_embedded = None
+
+        if (not is_keyword_embedded):
+            newly_embedded += 1
+            embedding = prompts.embedding_scaffold(keyword['search_query'])
+            print(f"clustered: {keyword['search_query']}")
+            create_document('keywords', json.dumps({
+                'id': keyword['_id'],
+                'parent_id': keyword['_id'],
+                'text': keyword['search_query'],
+                'embedding': embedding,
+                'metadata': {
+                    'list_id': _id,
+                }
+            }, cls=UUIDEncoder))
+        else:
+            embedding = is_keyword_embedded['embedding']
+
+        kw_embedding.append({
+            'keyword': keyword['search_query'],
+            'embedding': embedding
+        })
+
+    print(f'number_of_newly_embedded_kw: {newly_embedded}')
+    num_clusters = request.data.get('cluster_count', None)
+
+    eps, min_samples = suggested_num_clusters(embeddings=[d['embedding'] for d in kw_embedding])
+
+    print(f"{eps}, {min_samples}")
+
+    if not num_clusters:
+        num_clusters = min_samples
+
+    print(f'suggested_clusters_count: {min_samples} - selected clusters count: {num_clusters}')
+
+    clusters = cluster_keywords(dataset=kw_embedding, num_clusters=num_clusters)
+
+    serializer = KeywordsPostSerializer(keywords_list, data={
+        'saved_cluster':clusters,
+        'user': user['id']
+    })
+    if serializer.is_valid():
+        serializer.save()
+    else:
+        print(serializer.errors)
+
+    return JsonResponse(clusters, safe=False)
 
 
 @api_view(['POST'])
@@ -308,17 +368,19 @@ def getRelatedQuestions(request):
 
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
 def searchActions(request, _id=None):
+    user = get_user_from_token(request)
     if request.method == 'GET':
         if _id is not None:
             suggestion = get_object_or_404(Suggestion, _id=_id)
             serializer = SearchGetSerializer(suggestion)
             return Response(serializer.data)
         else:
-            suggestions = Suggestion.objects.all()
+            suggestions = Suggestion.objects.filter(user=user['id'])
             serializer = SearchGetSerializer(suggestions, many=True)
             return Response(serializer.data)
     
-    """ elif request.method == 'POST':
+    request.data['user'] = user['id']
+    if request.method == 'POST':
         serializer = SuggestionSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -339,7 +401,7 @@ def searchActions(request, _id=None):
 
     elif request.method == 'DELETE':
         suggestion.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT) """
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET'])
 def google_search(request):
@@ -472,7 +534,9 @@ def wordpress_post(request):
 
 @api_view(['POST'])
 def clusterKeywords(request, _id=None):
-    clusters_count = request.data["cluster_count"]
+    clusters_count = request.data.get('cluster_count')
+
+    print(f"Cluster count: {clusters_count}")
     keywordsList = get_object_or_404(Keywords, _id=_id)
     serializer = KeywordsSerializer(keywordsList)
 
@@ -492,23 +556,41 @@ def clusterKeywords(request, _id=None):
     print("Not valid")
     return Response(serializer.data)
 
+@api_view(['GET'])
+def get_keywords_list_suggestions(request, _id=None):
+    if _id is not None:
+        keywordsList = get_object_or_404(Keywords, _id=_id)
+        suggestions = keywordsList.suggestions.all()
+        data = manual_pagination(suggestions, SuggestionSerializer, request)
+        return JsonResponse(data)
+
 
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
 def keywordsActions(request, _id=None):
+    user = get_user_from_token(request)
     if request.method == 'GET':
         if _id is not None:
             keywordsList = get_object_or_404(Keywords, _id=_id)
             serializer = KeywordsSerializer(keywordsList)
             return Response(serializer.data)
         else:
-            keywords = Keywords.objects.all()
+            keywords = Keywords.objects.filter(user=user['id'])
             serializer = KeywordsSerializer(keywords, many=True)
             return Response(serializer.data)
     
-    elif request.method == 'POST':
+    request.data['user'] = user['id']
+    if request.method == 'POST':
+        suggestions_list = request.data.get("keywords", [])
+        suggestions = [{ 'parent_keyword': '-', 'search_query': suggestion, 'project': request.data.get("project", None), 'user': user['id'] } for suggestion in suggestions_list]
+
+        suggestionsSerializer = SuggestionSerializer(data=suggestions, many=True)
+        if suggestionsSerializer.is_valid():
+            suggestionsSerializer.save()
+
         embeddedKeywords = {
             "title": request.data.get("title", None),
-            "suggestion": request.data.get("suggestion", None),
+            "suggestions": [suggestion['_id'] for suggestion in suggestionsSerializer.data],
+            "user": user['id']
         }
         """ for keyword in request.data["keywords"]:
             embedding = prompts.embedding_scaffold(keyword)
@@ -516,7 +598,7 @@ def keywordsActions(request, _id=None):
                 "keyword": keyword,
                 "embedding": embedding
             }) """
-        serializer = KeywordsSerializer(data=embeddedKeywords)
+        serializer = KeywordsPostSerializer(data=embeddedKeywords)
         if serializer.is_valid():
             serializer.save()
             return Response(request.data.get("title"), status=status.HTTP_201_CREATED)
@@ -536,5 +618,44 @@ def keywordsActions(request, _id=None):
 
     elif request.method == 'DELETE':
         keywordsList.delete()
+        delete_document('keywords', { 'filter_by': f'id:={_id}' })
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+# TODO: add project required decorator
+@api_view(['POST'])
+def autocomplete(request):
+    try:
+        general_niche = request.data.get('general_niche', None)
+        if not general_niche:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        
+        results = autocomplete_suggestions(request.data)
+
+        return create_ideation_keywords_list(general_niche, request, results)
+    except Exception as e:
+        return e
+
+@api_view(['POST'])
+def alphabet_soup(request):
+    try:
+        partial_query = request.data.get('partial_query', None)
+        if not partial_query:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        
+        results = alphabet_soup_method(partial_query, request.data.get('country', 'US'))
+        return create_ideation_keywords_list(partial_query, request, results)
+    except Exception as e:
+        return e
+
+@api_view(['POST'])
+def query_generation(request):
+    try:
+        partial_query = request.data.get('general_niche', None)
+        if not partial_query:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        
+        results = query_generation_method(request.data)
+
+        return create_ideation_keywords_list(partial_query, request, results)
+    except Exception as e:
+        return e

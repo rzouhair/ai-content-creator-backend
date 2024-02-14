@@ -14,6 +14,8 @@ core/__pycache__/
 # C extensions
 *.so
 
+.env.local
+
 dump_*.sql
 
 # Distribution / packaging

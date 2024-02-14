@@ -1,3 +1,5 @@
+from html import unescape
+import json
 import re
 import time
 from bs4 import BeautifulSoup
@@ -5,6 +7,49 @@ import requests
 from core.helpers import get_html_content, unescape_html, get_response_content
 from keywordresearch.helpers.get_article_data import get_post_info
 from .get_article_info import get_article_info
+
+def get_bing_suggestions(query, country='US'):
+    USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
+    headers = {"user-agent": USER_AGENT} 
+    
+    bing_url = f"https://www.bing.com/AS/Suggestions"
+    params = {
+        "mkt": country,
+        "qry": query,
+        "cp": 10,
+        "cvid": "6E3353AA20CE4BDFA6634D8441275B34"
+    }
+
+    try:
+        response = requests.get(bing_url, params=params, headers=headers)
+        response.raise_for_status()
+        html_content = response.text
+        unescaped_html = unescape(html_content)
+        soup = BeautifulSoup(unescaped_html, 'html.parser')
+        options = soup.select('li.sa_sg[role="option"]')
+        return options
+    except requests.exceptions.RequestException as e:
+        print("Error fetching Bing suggestions:", e)
+        return None
+
+def get_google_suggestions(query, country='US', with_styling=False):
+    base_url = f"https://www.google.com/complete/search?q={query}&gl={country}&cp=4&client=gws-wiz-serp&xssi=t&authuser=0&psi=bVUaZPSOEtCtkdUPoNa0-Ag.1679447406374&dpr=2"
+
+    USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
+    headers = {"user-agent": USER_AGENT} 
+
+    url = base_url
+
+    try:
+      response = get_response_content(url, headers=headers)
+      
+      response = response[4:]  # remove the first 4 characters ")]}'"
+      data = json.loads(response)
+      return map(lambda q: q[0] if with_styling else unescape_html(q[0].replace('<b>', '').replace('</b>', '')), unescape_html(data[0]))
+    except requests.exceptions.RequestException as e:
+        print("Error fetching suggestions:", e)
+        return None
+
 
 def get_search_query_html(query):
     try:
@@ -107,6 +152,58 @@ def get_organic_search_results(html, with_data = False):
 
     return serps
 
+def extract_ppa_questions(soup, old_questions):
+    questions = [*old_questions]
+
+    if not soup:
+        return None
+
+    ppa_soup = soup.select('div[data-initq] div[data-sgrd] div div[role="button"]')
+
+    ppa_holders = [k['question'] for k in questions if k['type'] == 'PPA']
+    for i, ppa in enumerate(ppa_soup):
+        text = ppa.get_text().strip()
+        if text in ppa_holders:
+            for q in questions:
+                if q.get('type') == 'PPA' and q.get('question') == text:
+                    q['visible_in_serps'] = q.get('visible_in_serps', 0) + 1
+        else:
+            ppa_holders.append(text)
+            questions.append({
+                "question": ppa.get_text().strip(),
+                "type": 'PPA',
+                'visible_in_serps': 1,
+            })
+
+    print(questions)
+    return questions
+
+def extract_related_questions(soup, old_questions):
+    questions = [*old_questions]
+
+    if not soup:
+        return None
+
+    related_questions_soup = soup.select('[data-abe] a')
+    related_holders = [k['question'] for k in questions if k['type'] == 'Related']
+
+    for i, rq in enumerate(related_questions_soup):
+        text = rq.get_text().strip()
+        if text in related_holders:
+            for q in questions:
+                if q.get('type') == 'Related' and q.get('question') == text:
+                    q['visible_in_serps'] = q.get('visible_in_serps', 0) + 1
+        else:
+            related_holders.append(text)
+            questions.append({
+                "question": text,
+                "type": 'Related',
+                'visible_in_serps': 1,
+            })
+
+    print(questions)
+    return questions
+
 
 def get_keyword_questions(keyword, old_questions = []):
 
@@ -128,8 +225,11 @@ def get_keyword_questions(keyword, old_questions = []):
   if not soup:
       return None
 
-  ppa_soup = soup.select('div[data-initq] div[data-sgrd] div div[role="button"]')
+  ppa_holders = extract_ppa_questions(soup, questions)
+  related_holders = extract_related_questions(soup, questions)
 
+
+  """ ppa_soup = soup.select('div[data-initq] div[data-sgrd] div div[role="button"]')
   ppa_holders = []
   for i, ppa in enumerate(ppa_soup):
     text = ppa.get_text().strip()
@@ -146,7 +246,7 @@ def get_keyword_questions(keyword, old_questions = []):
       })
     
 
-  related_questions_soup = soup.select('a[data-xbu="true"]')
+  related_questions_soup = soup.select('[data-abe] a')
   related_holders = []
   for i, rq in enumerate(related_questions_soup):
     text = rq.get_text().strip()
@@ -161,12 +261,19 @@ def get_keyword_questions(keyword, old_questions = []):
           "type": 'Related',
           'visible_in_serps': 1,
       })
-
+ """
+  print(f"First batch: {questions}")
+  print(f"First batch: {ppa_holders}")
+  print(f"First batch: {related_holders}")
   print(f"First batch done")
 
-  first_batch_of_questions = [*questions]
+  first_batch_of_questions = [*questions, *ppa_holders, *related_holders]
 
-  for q in first_batch_of_questions:
+  loop_questions = [*questions, *ppa_holders, *related_holders]
+
+  print("Loop questions")
+  print(loop_questions)
+  for q in loop_questions:
 
     time.sleep(3)
     print(f"Slept 1 second for {q.get('question')} - {q.get('type')}")
@@ -180,7 +287,9 @@ def get_keyword_questions(keyword, old_questions = []):
     inner_html = response.text
 
     inner_soup = BeautifulSoup(inner_html, 'html.parser')
-    inner_ppa_soup = inner_soup.select('div[data-initq] div[data-sgrd] div div[role="button"]')
+    inner_ppa_questions = extract_ppa_questions(inner_soup, first_batch_of_questions)
+    first_batch_of_questions = inner_ppa_questions
+    """ inner_ppa_soup = inner_soup.select('div[data-initq] div[data-sgrd] div div[role="button"]')
 
     for i, ppa in enumerate(inner_ppa_soup):
       text = ppa.get_text().strip()
@@ -194,9 +303,12 @@ def get_keyword_questions(keyword, old_questions = []):
             "question": ppa.get_text().strip(),
             "type": 'PPA',
             'visible_in_serps': 1,
-        })
+        }) """
 
-    inner_related_questions_soup = soup.select('a[data-xbu="true"]')
+    inner_related_questions = extract_related_questions(inner_soup, first_batch_of_questions)
+    first_batch_of_questions = inner_related_questions
+
+    """ inner_related_questions_soup = soup.select('a[data-abe="true"]')
 
     for i, rq in enumerate(inner_related_questions_soup):
       text = rq.get_text().strip()
@@ -210,9 +322,9 @@ def get_keyword_questions(keyword, old_questions = []):
             "question": text,
             "type": 'Related',
             'visible_in_serps': 1,
-        })
+        }) """
 
-  return list(questions)
+  return list(first_batch_of_questions)
 
 def merge_questions(arr1, arr2):
     merged = []

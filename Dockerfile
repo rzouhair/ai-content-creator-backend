@@ -13,14 +13,12 @@ RUN apt-get update && apt-get install -y \
     libjpeg-dev \
     postgresql-server-dev-all
 
+RUN apt-get install poppler-utils libleptonica-dev tesseract-ocr liblept5 libtesseract-dev python3-pil tesseract-ocr-eng tesseract-ocr-script-latn -y
+
 WORKDIR /code
 
 COPY requirements.txt /code/
 
 RUN pip install --no-cache-dir -r requirements.txt
-
-RUN pip install --no-cache-dir psycopg2-binary
-
-RUN pip install --no-cache-dir keybert[spacy]
 
 COPY . /code/

@@ -24,6 +24,7 @@ class Skill(models.Model):
     emoji = models.CharField(max_length=5, blank=True)
     input_schema = ArrayField(models.JSONField())
     tags = models.ManyToManyField(Tag)
+    examples = models.TextField(default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -46,7 +47,7 @@ class Prompt(models.Model):
 
 class Output(models.Model):
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="id", db_column="user_id")
     text = models.TextField()
     completionId = models.CharField(max_length=255, blank=True, default=None)
     usage = models.JSONField()
@@ -63,7 +64,7 @@ class Output(models.Model):
 
 class Project(models.Model):
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="id", db_column="user_id")
     name = models.CharField(max_length=255, blank=True, default=None, unique=True)
     description = models.TextField(blank=True, default="-")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -78,7 +79,7 @@ class Project(models.Model):
 class Document(models.Model):
 
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="id", db_column="user_id")
     content = models.TextField()
     delta = models.JSONField(blank=True, default=dict)
     name = models.CharField(max_length=255, blank=True, default=None, unique=True)
@@ -97,7 +98,7 @@ class Document(models.Model):
 
 class Recipe(models.Model):
     _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="_id", db_column="user_id")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="id", db_column="user_id")
     name = models.TextField(unique=True)
     body = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -107,3 +108,31 @@ class Recipe(models.Model):
 
     class Meta:
         verbose_name_plural = 'Recipes'
+
+MEMORY_TYPES = {
+    ("TEXT", "Text"),
+    ("YTB", "Youtube"),
+    ("FILE", "File"),
+}
+
+MEMORY_STATUS_TYPES = {
+    ('CREATED', "Created"),
+    ("PROCESSING", "Processing"),
+    ("PROCESSED", "Processed"),
+    ("ERROR", "Error"),
+}
+class Memory(models.Model):
+    _id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, to_field="id", db_column="user_id")
+    name = models.TextField(unique=True)
+    type = models.CharField(max_length=10, choices=MEMORY_TYPES)
+    status = models.CharField(max_length=10, choices=MEMORY_STATUS_TYPES, default="CREATED")
+    metadata = models.JSONField(default=dict)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    def __str__(self):
+        return str(self.name)
+
+    class Meta:
+        verbose_name_plural = 'Memories'
