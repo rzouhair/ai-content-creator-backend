@@ -134,7 +134,7 @@ def memory_file_analysis(args):
         # Upload file
         uploaded_file = upload_to_s3(file, 'seotoolfiles', memory_id, file_name=file_name)
         fil = split_s3_file('seotoolfiles', uploaded_file['path'])
-        split = split_text(fil[0].page_content, 200, 40)
+        split = split_text(fil[0].page_content, 2500, 40)
         changing_data['metadata'] = {
           'file': uploaded_file
         }
@@ -184,7 +184,7 @@ def memory_text_analysis(args):
         if serializer.is_valid():
           serializer.save()
 
-        split = split_text(text, 200, 40)
+        split = split_text(text, 2500, 40)
         for t in split:
           print(f"Processing item for Memory {memory_id}")
           embedding = embedding_scaffold(t)
@@ -237,7 +237,7 @@ def memory_youtube_analysis(args):
         video_id = extract_video_id(url)
         transcript = YouTubeTranscriptApi.get_transcript(video_id)
         transcript_texts = ' '.join([t['text'] for t in transcript])
-        split = split_text(transcript_texts, 200, 40)
+        split = split_text(transcript_texts, 2500, 40)
         changing_data['metadata'] = {
           'url': url
         }

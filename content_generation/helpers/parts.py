@@ -1,116 +1,208 @@
+from content_generation.helpers.improval_prompts import improve_readability
+from content_generation.helpers.post_prompts import get_memory_context, listicle_outline_prompt
 from . import prompts
 import json
+from .post_prompts import articleLengthMap, beginner_guide_outline_prompt, expanded_definition_outline_prompt, generate_heading_paragraph, how_to_guide_outline_prompt 
 
-def generateTitlePart(topic, num_titles = 1):
+def generateTitlePart(data):
+  language = data['language']
+  topic = data['targetKeyword']
+  article_type = data['articleType']
+  article_length = articleLengthMap[data['articleLength']]
+
+  titles_function = [
+    {
+      "name": "get_generated_title",
+      "description": "Get the generated title from the prompt",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The blog post title",
+          },
+        },
+        "required": ["title"],
+        "additionalProperties": False,
+      },
+    }
+  ];
+
+  titles_templates = {
+    "listicle": """
+XX Ways to [Desired Outcome]
+XX [Topic] Tips [Benefit or Desire]
+XX [Type] Tools [Benefit or Desire]
+XX Reasons Why [Problem]
+XX [Topic] Techniques [Benefit or Desire]
+XX [Products] For [Audience]
+
+Where XX is a number and the other words in brackets are placeholders.
+""",
+    "how_to_guide": """- For (How to guides): 
+How to [Achieve Desired Outcome] (XX Steps)
+How to [Achieve Desired Outcome] (Even If [Common Obstruction]]
+How to [Achieve Desired Outcome] ([Additional Benefit]]""",
+
+    "expanded_definition": """- For (Expanded definitions posts):
+What is/are [Concept]? Everything You Need to Know
+What is/are [Acronym]? [Expanded Acronym] Explained
+What is/are [Concept]? A [Brief/Quick/Detailed] Introduction""",
+
+    "beginner_guide": """- For (Beginner's guides posts):
+[Topic] For Beginners: [Desire]
+The Beginner's Guide to [Topic]
+The Noob-Friendly Guide to [Topic]"""
+  }
+
   chat_resp = prompts.chat_scaffold([
-    {"role": "system", "content": prompts.meta_title_system_prompt },
-    {"role": "user", "content": f"""
-    Prompt: Generate a specified number of SEO optimized titles for the target keyword "{topic}' sexe", using the following criteria: Relevant keywords (including the target keyword), short and concise title (maximum 59 characters), descriptive language, unique value proposition, and appropriate use of title tags. Ensure the titles engage the reader, avoid generic phrases, and seamlessly integrate the target keywords. Use descriptive language to communicate the main idea of the article succinctly, while offering a unique value proposition that sets your content apart from others. Format your titles with title tags to make them easy to locate while enhancing readability. Here's an example title based on the target keyword "can cockatiels sleep with noise":
+    { "role": "system", "content": "You are a blog post title generator, you help the user create catchy, relevant titles that can improve click-through rates and enhance website rankings. When generating your response, please focus solely on providing relevant and informative content that directly answers the prompt. Please refrain from using affirmative language or providing irrelevant information that does not directly address the prompt." },
+    {"role": "user", "content": f"""I want you to respond only in language {language}.  
+I want you to act as a blog post title writer that speaks and writes fluent {language}. 
+I will type a title, or keywords via comma and you will reply with a list of blog post titles in {language} based on the chosen post type. 
+They should all have a hook and high potential to go viral on social media.
 
-"Noise and Sleep: Understanding Your Cockatiel's Rest Patterns" (58 characters)
+Choose a the best title suited for the chosen topic out of the following titles:
+{titles_templates[article_type]}
+XX should align with the article sections count: {article_length} and be converted to a respective number of sections / tips / list items.
 
-Generate {num_titles} SEO optimized titles that comply with the above criteria, and format them into a valid plain JSON array of strings.
-    """}
-  ])
+You must write all in {language}. my first keywords are {topic} and the chosen list post is {article_type}
+  """ },
+  ], titles_function)
 
   return chat_resp
 
+def generateOutline(data):
+  titles_function = [
+    {
+      "name": "get_outline",
+      "description": "Get the generated outline as a JSON array from the prompt",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "outline": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ['introduction', 'normal', 'faq'],
+                  "description": "The type of the generated outline",
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The name of the section",
+                },
+                "children": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ['normal'],
+                        "description": "The type of the child item which should only be 'normal'",
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "the subheading or entity content / name",
+                      },
+                    }
+                  },
+                  "required": ["type", "name"],
+                }
+              },
+              "required": ["type", "name"],
+              "additionalProperties": False,
+            }
+          }
+        },
+        "required": ["outline"],
+        "additionalProperties": False,
+      },
+    }
+  ];
 
-def generateTeeUp(title, target_keyword = None, num_outputs = 1):
+  memory = data.get('memory_id', None)
+  context = None
+  if memory:
+    context = get_memory_context(memory, f"Target keyword: {data['targetKeyword']} - Title: {data['title']}")
+
   chat_resp = prompts.chat_scaffold([
-    {"role": "system", "content": "Act as a professional SEO content writer, I provide you the main blog post title and some criteria, and you generate a Tee-up section that follows the given critera, the main conditons are, write in 8th or 9th grade reading level with high readability score, include the target keyword in the first section, and make it natural and helpful." },
-    {"role": "user", "content": f"""
-      Title: {title}
-      Target keyword: {target_keyword or title}
-      Prompt: Generate {num_outputs} introductory section for a blog post around the main topic "{target_keyword or title}" with the title "{title}" that fulfills the following criteria:
-
-      - Clearly identifies the topic of the post
-      - Establishes a rapport with the reader and instills confidence in your ability to provide helpful information
-      - Avoids mentioning other topics excessively to avoid triggering Google's spam filters
-      - Contains a human touch that is free from plagiarism
-      - Is 2-3 sentences in length.
-
-      Make sure you return a valid JSON array of strings containing the number of desired sections with no fluff or jargon.
-    """}
-  ])
-  return chat_resp
-
-
-
-def generateOutline(title):
-  chat_resp = prompts.chat_scaffold([
-    {"role": "system", "content": prompts.outline_system_prompt },
-    {"role": "user", "content": f"Prompt: Generate an SEO-optimized outline for a blog post with the title \"{title}\" that includes a catchy introduction, sections with H2 subheadings, and relevant keywords. If any H2 subheading is too broad to fit under one subheading, add H3 headings. always start with an Introduction heading and end with a conclusion, both should not have any h3." \
-
-"Generate ONLY ONLY the subheadings in a plain JSON array of objects, each object should contain the h2 headings that is related to the title in the field \"h2\" and if there are h3 headings add them to the object in the field \"h3\" which is an array of strings\nNote: Please provide only a plain JSON array not an object, Please provide relevant and informative content that directly answers the prompt. Do not use affirmative language or provide irrelevant information that doesn't address the prompt."}
-  ])
+    { "role": "system", "content": f"Here is some background data: \n {context}" if context else "" },
+    {"role": "user", "content": {
+      "listicle": listicle_outline_prompt,
+      "how_to_guide": how_to_guide_outline_prompt,
+      "expanded_definition": expanded_definition_outline_prompt,
+      "beginner_guide": beginner_guide_outline_prompt,
+    }[data['articleType']](data) }
+  ], function_call=titles_function)
   return chat_resp
 
 
 def generateSection(data):
-    d = {}
-    section = data['section']
-    title = data['title']
-    targetKeyword = data['targetKeyword']
+  section_num = data['sectionNum']
+  section_index = section_num - 1
+  section = data['sections'][section_index]
 
-    h2_section = None
-    h3_sections = []
+  memory = data.get('memory_id', None)
+  context = None
+  if memory:
+    context = get_memory_context(memory, f"Target keyword: {data['targetKeyword']} - Title: {data['title']} - Heading: {section['name']}")
 
-    if (section['h2'].lower() == 'introduction'):
-      chat_resp = generateTeeUp(title, target_keyword=targetKeyword, num_outputs=1)
-      return {
-        "heading": section['h2'],
-        "paragraph": list(json.loads(str(chat_resp["content"]).replace('",', '"')))[0]
-      }
+  titles_function = [
+    {
+      "name": "get_paragraph",
+      "description": "Get the generated paragraph for the heading",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "paragraph": {
+            "type": "string",
+            "description": "The current heading's paragraph",
+          },
+        },
+        "required": ["paragraph"],
+        "additionalProperties": False,
+      },
+    }
+  ];
 
-    h2 = prompts.chat_scaffold([
-      {"role": "system", "content": prompts.blog_section_dev },
-      {"role": "user", "content": f"""
-        Title: {title}
-        Target keyword: {targetKeyword}
-        Subheading: {section['h2']}
+  output = {}
 
-        Prompt: Write a blog post section that expands upon the topic presented in the title and subheading. The section should definitely answer the subheading question at the beginning of the section with no fluff and jargon. Your writing should be at an 8th or 9th grade reading level, and use short paragraphs with a line break after every 2-3 sentences. Research relevant keywords and optimize your content for SEO by including them in a natural way throughout your post. Use a descriptive heading that accurately reflects the content of your article.
+  resp = prompts.chat_scaffold([
+    { "role": "system", "content": f"Here is some background data: \n {context}" if context else "" },
+    { "role": "user", "content": generate_heading_paragraph(section['name'], 'h2', data) }
+  ], titles_function)
 
-        Provide enough detail to adequately address the subject matter while still keeping your language clear, natural and concisely detailed. Consider using bullet points or numbered lists to make it easier for readers to follow. Illustrate your ideas with relevant examples that add value to your readers. Avoid technical jargon and other language that might obscure the meaning of the text.
-
-        Finally, review your work to ensure it is error-free and provides value to your readers, and return only the generated paragraph.
-      """}
+  if (data['improveReadability']):
+    resp = prompts.chat_scaffold([
+      { "role": "user", "content": improve_readability(resp['content']['paragraph']) }
     ])
 
-    h2_section = {
-      "heading": section['h2'],
-      "paragraph": h2['content']
-    }
+  output['h2'] = {
+    'heading': section['name'],
+    'paragraph': resp['content']
+  }
 
-    if section.get('h3', None) and len(section.get('h3', None)):
-      for h3 in section['h3']:
-        current_h3 = prompts.chat_scaffold([
-          {"role": "system", "content": prompts.blog_section_dev },
-          {"role": "user", "content": f"""
-        Title: {targetKeyword}
-        Parent subheading: {section['h2']}
-        Subheading: {h3}
+  if (len(section['children'])):
+    output['h3'] = []
+    for child in section['children']:
+      resp = prompts.chat_scaffold([
+        { "role": "system", "content": f"Here is some background data: \n {context}" if context else "" },
+        { "role": "user", "content": generate_heading_paragraph(child['name'], 'h3', data) }
+      ], titles_function)
 
-        Prompt: Write a blog post section that expands upon the topic presented in the title and subheading and the parent subheading. The section should definitely answer the subheading question at the beginning of the section with no fluff and jargon. Your writing should be at an 8th or 9th grade reading level, and use short paragraphs with a line break after every 2-3 sentences. Research relevant keywords and optimize your content for SEO by including them in a natural way throughout your post. Use a descriptive heading that accurately reflects the content of your article.
-
-        Provide enough detail to adequately address the subject matter while still keeping your language clear, natural and concisely detailed. Consider using bullet points or numbered lists to make it easier for readers to follow. Illustrate your ideas with relevant examples that add value to your readers. Avoid technical jargon and other language that might obscure the meaning of the text.
-
-        Finally, review your work to ensure it is error-free and provides value to your readers, and return only the generated paragraph.
-          """}
+      if (data['improveReadability']):
+        resp = prompts.chat_scaffold([
+          { "role": "user", "content": improve_readability(resp['content']['paragraph']) }
         ])
-        h3_sections.append({
-          "heading": h3,
-          "paragraph": current_h3['content']
-        })
+
+      output['h3'].append({
+        'paragraph': resp['content'],
+        'heading': child['name']
+      })
+
+  return output
       
-      if len(h3_sections) > 0:
-        h2_section["children"] = h3_sections
-    try:
-      return {
-        'section': json.loads(h2_section)
-      }
-    except:
-      return {
-        'section': h2_section
-      }

@@ -1,26 +1,36 @@
+import os
 import openai
 import json
 
-# sk-THOWTtzJ1MmxKZkswur5T3BlbkFJyhkR1IfLQVPTiqMm38R
-openai.api_key = "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"
-GPT_MODEL='gpt-3.5-turbo-0125'
+open_ai_api_key = os.getenv('OPEN_AI_API_KEY')
+openai.api_key = open_ai_api_key
+
+GPT_MODEL='gpt-4o-mini'
 EMBEDDING_MODEL="text-embedding-ada-002"
 
 def embedding_scaffold(input):
+  print(f"Start embedding : {input}")
   response = openai.Embedding.create(
     input=input,
     model=EMBEDDING_MODEL
   )
 
+  print("Done embedding")
+
   return response.data[0].embedding
 
-def chat_scaffold(messages):
+def chat_scaffold(messages, function_call=None):
   resp = openai.ChatCompletion.create(
     model=GPT_MODEL,
-    messages=messages
+    messages=messages,
+  ) if not function_call else openai.ChatCompletion.create(
+    model=GPT_MODEL,
+    messages=messages,
+    functions=function_call,
+    function_call="auto",
   )
 
-  content = resp.choices[0].message.content
+  content = resp.choices[0].message.content if not function_call else resp.choices[0].message.function_call.arguments
 
   try:
     return {

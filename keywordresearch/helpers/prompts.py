@@ -1,6 +1,9 @@
+import os
 import openai
 
-openai.api_key = "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"
+open_ai_api_key = os.getenv('OPEN_AI_API_KEY')
+
+openai.api_key = open_ai_api_key
 EMBEDDING_MODEL="text-embedding-ada-002"
 
 def embedding_scaffold(input):

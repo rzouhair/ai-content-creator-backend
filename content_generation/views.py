@@ -76,20 +76,15 @@ def writeBlogPost(request):
         'paragraphs': chat_resp['content']
       })
     elif request.data['part'] == 'title':
-      chat_resp = parts.generateTitlePart(request.data['targetKeyword'], request.data.get('num_titles', 1))
+      chat_resp = parts.generateTitlePart(request.data)
       return Response({
-        'title': chat_resp['content']
+        'title': chat_resp['content']['title']
       })
     elif request.data['part'] == 'sections':
-      chat_resp = parts.generateOutline(request.data['targetKeyword'])
-      try: 
-        return Response({
-          'sections': json.loads(chat_resp)
-        })
-      except:
-        return Response({
-          'sections': chat_resp
-        })
+      chat_resp = parts.generateOutline(request.data)
+      return Response({
+        'sections': chat_resp['content']['outline']
+      })
     elif request.data['part'] == 'section':
       chat_resp = parts.generateSection(request.data)
 
@@ -173,7 +168,7 @@ def skillsActions(request, _id=None):
     if request.method == 'GET':
         class RestrictedSkillGetSerializer(SkillGetSerializer):
           class Meta(SkillGetSerializer.Meta):
-              fields = ['_id', 'name', 'description', 'hidden', 'icon', 'emoji', 'beta', 'input_schema', 'tags', 'created_at', 'updated_at']
+              fields = ['_id', 'name', 'description', 'hidden', 'icon', 'emoji', 'beta', 'memory_eligible', 'input_schema', 'tags', 'created_at', 'updated_at']
         if _id is not None:
             skill = get_object_or_404(Skill, _id=_id)
             if request.user.is_authenticated and request.user.groups.filter(name='Admin').exists():
@@ -188,11 +183,13 @@ def skillsActions(request, _id=None):
 
     elif request.method == 'POST':
       if isinstance(request.data, dict):
-          # If the request data is a single skill object, serialize and save it
-          serializer = SkillSerializer(data=request.data)
-          if serializer.is_valid():
-              serializer.save()
-              return Response(serializer.data, status=status.HTTP_201_CREATED)
+        # If the request data is a single skill object, serialize and save it
+        serializer = SkillSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+          return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
       elif isinstance(request.data, list):
           # If the request data is a list of skills, serialize and save each skill
           serialized_skills = []
@@ -444,8 +441,6 @@ def memoryActions(request, _id=None):
         delete_document('memories', { 'filter_by': f'parent_id:={_id}' })
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-
 @api_view(['GET', 'POST', 'PUT'])
 def skillPrompt(request, _id=None):
   if (not _id):
@@ -550,41 +545,65 @@ def execute(request):
   if request.data['skill_id'] == None or request.data['inputs'] == None:
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
-  print("Skill found")
   try:
     prompt = get_object_or_404(Prompt, skill=request.data['skill_id'])
-    print("Prompt found")
   except:
-    return Response(status=status.HTTP_400_BAD_REQUEST)
+    return Response("This skill is not usable", status=status.HTTP_404_NOT_FOUND)
 
-  prompt_text = prompt.prompt
+  try:
+    skill = get_object_or_404(Skill, _id=request.data['skill_id'])
+  except:
+    return Response("Skill not found", status=status.HTTP_404_NOT_FOUND)
+
+  prompt_text = prompt.prompt + "\n Please in the {language}"
 
   for _id, value in request.data['inputs'].items():
     prompt_text = prompt_text.replace("{" + _id + "}", str(value))
 
-  results = []
 
   bg_data = ""
   memory_id = request.data.get('memory', None)
 
   if memory_id:
+    eligible_fields = [ipt for ipt in skill.input_schema if True == True]
+    context = ""
+
+    for field in eligible_fields:
+      field_id = field.get('id')
+      field_label = field.get('label')
+
+      field_value = request.data['inputs'][field_id]
+
+      context += f"""
+{field_label} ({field_id}):
+{field_value}
+"""
+    print(context)
     filters = {
         'q': '*',
         'query_by': '*',
         'filter_by': f"parent_id:={str(memory_id)}",
-        "per_page": 15,
+        "per_page": 10,
         "page": 1
     }
-    # nearest_neighbor_search('memories', )
+
+    neighbors_res = nearest_neighbor_search(
+      'memories',
+      context,
+      15,
+      filters,
+      0.5
+    )
+    print([d['document'] for d in neighbors_res['hits']])
     bg_data = retrieve_documents('memories', filters)
     bg_data = '\n'.join([t['text'] for t in bg_data])
 
+  results = []
   for i in range(request.data["inputs"]['num_outputs']):
     chat_resp = prompts.chat_scaffold([
       {"role": "system", "content": f"Here is some background data: \n {bg_data}"},
-      {"role": "user", "content": prompt_text}
+      {"role": "user", "content": f"{prompt_text}"}
     ])
-    print(f"Here is some background data: \n {bg_data}")
     user = get_user_from_token(request)
     data = {
       "text": chat_resp["content"],

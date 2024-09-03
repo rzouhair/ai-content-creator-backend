@@ -25,6 +25,7 @@ class Skill(models.Model):
     input_schema = ArrayField(models.JSONField())
     tags = models.ManyToManyField(Tag)
     examples = models.TextField(default="")
+    memory_eligible = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
