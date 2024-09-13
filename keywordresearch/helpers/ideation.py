@@ -831,7 +831,7 @@ def create_ideation_keywords_list(list_name, request, results):
   print("User")
   suggestions = [{
     'parent_keyword': suggestion.get('search_query', '-'),
-    'search_query': suggestion.get('suggestion', None),
+    'search_query': suggestion.get('suggestion', 'n/a'),
     'project': request.data.get("project", None),
     'user': user['id'],
     'metadata': {

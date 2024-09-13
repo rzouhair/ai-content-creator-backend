@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
+from content_generation.helpers.post_prompts import generate_paragraph_image, generate_post_featured_image
 from content_generation.models import MEMORY_TYPES, Document, Memory, Output, Project, Prompt, Skill, Tag, Recipe
 from content_generation.serializers import DocumentGetSerializer, DocumentSerializer, MemorySerializer, OutputSerializer, ProjectSerializer, PromptSerializer, SkillGetSerializer, SkillSerializer, TagSerializer, RecipeSerializer, RecipeGetSerializer
 from core.clients import create_document, delete_document, nearest_neighbor_search, retrieve_document, retrieve_documents
@@ -77,8 +78,25 @@ def writeBlogPost(request):
       })
     elif request.data['part'] == 'title':
       chat_resp = parts.generateTitlePart(request.data)
+
+      title = chat_resp['content']['title']
+      generate_images = request.data.get('generateImages', False)
+      if (generate_images):
+        image_resp_prompt = generate_post_featured_image(title)
+        
+        image_resp = prompts.chat_scaffold([
+          { "role": "user", "content": image_resp_prompt }
+        ])
+
+        prompt = image_resp['content']
+
+        return Response({
+          'title': title,
+          'prompt': prompt or None
+        })
+
       return Response({
-        'title': chat_resp['content']['title']
+        'title': title,
       })
     elif request.data['part'] == 'sections':
       chat_resp = parts.generateOutline(request.data)

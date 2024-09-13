@@ -1,8 +1,9 @@
+import os
 from content_generation.helpers.improval_prompts import improve_readability
 from content_generation.helpers.post_prompts import get_memory_context, listicle_outline_prompt
 from . import prompts
-import json
-from .post_prompts import articleLengthMap, beginner_guide_outline_prompt, expanded_definition_outline_prompt, generate_heading_paragraph, how_to_guide_outline_prompt 
+import requests
+from .post_prompts import articleLengthMap, beginner_guide_outline_prompt, determine_best_paragraph_format, expanded_definition_outline_prompt, generate_heading_paragraph, generate_paragraph_image, get_linked_paragraph, how_to_guide_outline_prompt 
 
 def generateTitlePart(data):
   language = data['language']
@@ -73,6 +74,8 @@ You must write all in {language}. my first keywords are {topic} and the chosen l
   return chat_resp
 
 def generateOutline(data):
+  required = (['children'] if data['includeH3'] else [])
+
   titles_function = [
     {
       "name": "get_outline",
@@ -94,6 +97,10 @@ def generateOutline(data):
                   "type": "string",
                   "description": "The name of the section",
                 },
+                "is_part_of_topic": {
+                  "type": "boolean",
+                  "description": "Whether the section is part of the topic or not",
+                },
                 "children": {
                   "type": "array",
                   "items": {
@@ -113,7 +120,7 @@ def generateOutline(data):
                   "required": ["type", "name"],
                 }
               },
-              "required": ["type", "name"],
+              "required": ["type", "name", 'is_part_of_topic', *required],
               "additionalProperties": False,
             }
           }
@@ -144,12 +151,38 @@ def generateOutline(data):
 def generateSection(data):
   section_num = data['sectionNum']
   section_index = section_num - 1
-  section = data['sections'][section_index]
+  section = data['outline'][section_index]
 
   memory = data.get('memory_id', None)
   context = None
   if memory:
     context = get_memory_context(memory, f"Target keyword: {data['targetKeyword']} - Title: {data['title']} - Heading: {section['name']}")
+
+  format_function = [
+    {
+      "name": "get_paragraph_format",
+      "description": "Get the Best Paragraph Format for the heading",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The heading's Recommended format",
+          },
+          "suggestions": {
+            "type": "string",
+            "description": "The suggestions for the heading's Recommended format",
+          },
+          "explanation": {
+            "type": "string",
+            "description": "The explanation for the heading's Recommended format",
+          }
+        },
+        "required": ["format", "suggestions", "explanation"],
+        "additionalProperties": False,
+      },
+    }
+  ];
 
   titles_function = [
     {
@@ -171,9 +204,22 @@ def generateSection(data):
 
   output = {}
 
+  format = prompts.chat_scaffold([
+    { "role": "user", "content": determine_best_paragraph_format(data.get('title'), section.get('name')) },
+  ], format_function)
+
   resp = prompts.chat_scaffold([
     { "role": "system", "content": f"Here is some background data: \n {context}" if context else "" },
-    { "role": "user", "content": generate_heading_paragraph(section['name'], 'h2', data) }
+    { "role": "user", "content": f"""
+{generate_heading_paragraph(section, 'h2', data)}
+
+Recommended Paragraph Format:
+  {format['content']['format']}
+Explanation:
+  {format['content']['explanation']}
+Suggestions:
+  {format['content']['suggestions']}
+""" }
   ], titles_function)
 
   if (data['improveReadability']):
@@ -186,12 +232,84 @@ def generateSection(data):
     'paragraph': resp['content']
   }
 
-  if (len(section['children'])):
+  generate_images = data.get('generateImages', False)
+  
+  if (generate_images and section.get('is_part_of_topic', False)):
+    image_resp_prompt = generate_paragraph_image(output['h2'], data)
+    image_resp = prompts.chat_scaffold([
+      { "role": "user", "content": image_resp_prompt }
+    ], [
+      {
+        "name": "generate_image",
+        "description": "Generate an image prompt based on the given prompt",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "image_prompt": {
+              "type": "string",
+              "description": "The generated image prompt",
+            },
+          },
+          "required": ["image"],
+          "additionalProperties": False,
+        },
+      }
+    ])
+
+    prompt = image_resp['content']['image_prompt']
+
+    output['h2'] = {
+      'heading': section['name'],
+      'paragraph': resp['content'],
+      'prompt': prompt
+    }
+
+    print('Prompt here')
+    print(prompt)
+
+  if (data.get('getLinkedParagraph', False)):
+    linked_prompt = get_linked_paragraph(output['h2']['paragraph'])
+    linked = prompts.chat_scaffold([
+      { "role": "user", "content": linked_prompt }
+    ], [
+      {
+        "name": "get_linked_paragraph",
+        "description": "Get the generated linked paragraph",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "linked_paragraph": {
+              "type": "string",
+              "description": "The generated paragraph with potential anchor links opportunities",
+            },
+          },
+          "required": ["linked_paragraph"],
+          "additionalProperties": False,
+        },
+      }
+    ])
+
+    output['h2']['paragraph'] = linked['content']['linked_paragraph']
+
+  if (section.get('children', None) and len(section.get('children', []))):
     output['h3'] = []
     for child in section['children']:
+      format = prompts.chat_scaffold([
+        { "role": "user", "content": determine_best_paragraph_format(data.get('title'), section.get('name')) },
+      ], format_function)
+
       resp = prompts.chat_scaffold([
         { "role": "system", "content": f"Here is some background data: \n {context}" if context else "" },
-        { "role": "user", "content": generate_heading_paragraph(child['name'], 'h3', data) }
+        { "role": "user", "content": f"""
+{generate_heading_paragraph(child, 'h3', data)}
+
+Recommended Paragraph Format:
+  {format['content']['format']}
+Explanation:
+  {format['content']['explanation']}
+Suggestions:
+  {format['content']['suggestions']}
+""" }
       ], titles_function)
 
       if (data['improveReadability']):
@@ -206,3 +324,27 @@ def generateSection(data):
 
   return output
       
+
+def generateImage (prompt, options = {
+  "model": 'V_2',
+  "aspect_ratio": 'ASPECT_16_9',
+  "magic_prompt_option": 'OFF'
+}):
+  url = "https://api.ideogram.ai/generate"
+
+  apiKey = os.getenv('IDEOGRAM_API_KEY')
+
+  payload = { "image_request": {
+          "prompt": prompt,
+          "aspect_ratio": options.get('aspect_ratio', 'ASPECT_16_9'),
+          "model": options.get('model', 'V_2'),
+          "magic_prompt_option": options.get('magic_prompt_option', 'OFF')
+      } }
+  headers = {
+      "Api-Key": apiKey,
+      "Content-Type": "application/json"
+  }
+
+  response = requests.post(url, json=payload, headers=headers)
+
+  return response.json()
