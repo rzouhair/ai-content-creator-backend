@@ -200,6 +200,33 @@ Additional considerations for your prompt:
 Remember, your goal is to create a prompt that will result in a featured image that not only represents the blog post's content but also entices readers to click and read more.
 """
 
+def fill_in_image_prompt_placeholders(section, data):
+  heading = section['heading']
+  title = data['title']
+  return f"""
+Below is a generic image prompt template that you can use to generate a featured image for your blog post. Please fill in the placeholders with the appropriate details for the blog post's content.
+
+The section heading is: {heading}
+The blog post title is: {title}
+
+the image prompt should be in the following format:
+Basic Realistic Image Prompt Template:
+
+Create a professional, high-quality photo of [main subject].
+
+Shot type: [macro/wide/medium] shot
+Lighting: [lighting details]
+Perspective: [eye-level/top-down/side view]
+Environment: [setting details]
+Quality markers: [8K, high definition, professional photography]
+Style references: [Product photography, National Geographic style]
+Focus: Sharp focus on [specific element]
+Depth of field: [shallow/deep]
+
+Must include: [key elements]
+Must avoid: Text overlays, watermarks, artificial elements
+"""
+
 def generate_paragraph_image(section, data):
   heading = section['heading']
   paragraph = section['paragraph']
@@ -405,6 +432,7 @@ A markdown-formatted paragraph with potential link opportunities transformed int
 3. Don't over-link; aim for a balance that enhances readability without cluttering the text.
 4. Use your judgment to determine whether a link should be internal or external based on the context and nature of the term.
 5. Ensure that the transformed paragraph remains coherent and readable.
+6. Ensure the paragraph has text wrapping, making sentences and paragraphs shorter and easier to read.
 
 Please process the given paragraph according to these instructions.
 

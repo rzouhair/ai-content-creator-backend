@@ -41,4 +41,7 @@ urlpatterns = [
 
   path('recipes/', views.recipesActions, name='recipes-all'),
   path('recipes/<uuid:_id>/', views.recipesActions, name='recipes-actions'),
+
+  path('humanize/', views.humanize_content, name='humanize-content'),
+  path('generate_image/', views.generate_images, name='generate-image'),
 ]

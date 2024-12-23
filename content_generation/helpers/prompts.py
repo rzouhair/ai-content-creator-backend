@@ -30,14 +30,17 @@ def chat_scaffold(messages, function_call=None):
     function_call="auto",
   )
 
-  content = resp.choices[0].message.content if not function_call else resp.choices[0].message.function_call.arguments
 
   try:
+    if not function_call:
+      raise Exception
+    content = resp.choices[0].message.function_call.arguments
     return {
       'usage': resp['usage'],
       "content": json.loads(content)
     }
   except:
+    content = resp.choices[0].message.content
     return {
       'usage': resp['usage'],
       "content": content

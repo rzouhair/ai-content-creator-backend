@@ -1,9 +1,9 @@
 import os
-from content_generation.helpers.improval_prompts import improve_readability
+from content_generation.helpers.improval_prompts import generate_image, process_text_through_humanize, split_paragraph
 from content_generation.helpers.post_prompts import get_memory_context, listicle_outline_prompt
 from . import prompts
 import requests
-from .post_prompts import articleLengthMap, beginner_guide_outline_prompt, determine_best_paragraph_format, expanded_definition_outline_prompt, generate_heading_paragraph, generate_paragraph_image, get_linked_paragraph, how_to_guide_outline_prompt 
+from .post_prompts import articleLengthMap, beginner_guide_outline_prompt, determine_best_paragraph_format, expanded_definition_outline_prompt, fill_in_image_prompt_placeholders, generate_heading_paragraph, generate_paragraph_image, generate_post_featured_image, get_linked_paragraph, how_to_guide_outline_prompt 
 
 def generateTitlePart(data):
   language = data['language']
@@ -76,6 +76,8 @@ You must write all in {language}. my first keywords are {topic} and the chosen l
 def generateOutline(data):
   required = (['children'] if data['includeH3'] else [])
 
+  topic = data['targetKeyword']
+
   titles_function = [
     {
       "name": "get_outline",
@@ -135,15 +137,20 @@ def generateOutline(data):
   context = None
   if memory:
     context = get_memory_context(memory, f"Target keyword: {data['targetKeyword']} - Title: {data['title']}")
-
+  prompt = {
+    "listicle": listicle_outline_prompt,
+    "how_to_guide": how_to_guide_outline_prompt,
+    "expanded_definition": expanded_definition_outline_prompt,
+    "beginner_guide": beginner_guide_outline_prompt,
+  }[data['articleType']](data)
+  final_prompt_template = f"""
+  For this title: {data['title']}
+  Generate in the background the LSI keywords and entities relevant to the topic, and use them following the instructions below to generate an outline based on these keywords for the optimal SEO optimisation and Topical authority:
+  {prompt}
+  """
   chat_resp = prompts.chat_scaffold([
     { "role": "system", "content": f"Here is some background data: \n {context}" if context else "" },
-    {"role": "user", "content": {
-      "listicle": listicle_outline_prompt,
-      "how_to_guide": how_to_guide_outline_prompt,
-      "expanded_definition": expanded_definition_outline_prompt,
-      "beginner_guide": beginner_guide_outline_prompt,
-    }[data['articleType']](data) }
+    {"role": "user", "content": final_prompt_template }
   ], function_call=titles_function)
   return chat_resp
 
@@ -152,6 +159,9 @@ def generateSection(data):
   section_num = data['sectionNum']
   section_index = section_num - 1
   section = data['outline'][section_index]
+
+  generate_images = data.get('generateImages', False)
+  include_h3 = data.get('includeH3', False)
 
   memory = data.get('memory_id', None)
   context = None
@@ -223,34 +233,30 @@ Suggestions:
   ], titles_function)
 
   if (data['improveReadability']):
-    resp = prompts.chat_scaffold([
-      { "role": "user", "content": improve_readability(resp['content']['paragraph']) }
-    ])
+    resp = process_text_through_humanize(resp['content']['paragraph'])
 
   output['h2'] = {
     'heading': section['name'],
-    'paragraph': resp['content']
+    'paragraph': resp['output']
   }
-
-  generate_images = data.get('generateImages', False)
-  
+ 
   if (generate_images and section.get('is_part_of_topic', False)):
-    image_resp_prompt = generate_paragraph_image(output['h2'], data)
+    image_resp_prompt = fill_in_image_prompt_placeholders(output['h2'], data)
     image_resp = prompts.chat_scaffold([
       { "role": "user", "content": image_resp_prompt }
     ], [
       {
         "name": "generate_image",
-        "description": "Generate an image prompt based on the given prompt",
+        "description": "Generate an image prompt by filling in the placeholders",
         "parameters": {
           "type": "object",
           "properties": {
             "image_prompt": {
               "type": "string",
-              "description": "The generated image prompt",
+              "description": "The complete image prompt",
             },
           },
-          "required": ["image"],
+          "required": ["image_prompt"],
           "additionalProperties": False,
         },
       }
@@ -258,10 +264,14 @@ Suggestions:
 
     prompt = image_resp['content']['image_prompt']
 
+    if (generate_images):
+      images = generate_image(prompt, number_of_images=4)
+
     output['h2'] = {
       'heading': section['name'],
-      'paragraph': resp['content'],
-      'prompt': prompt
+      'paragraph': resp['output'],
+      'prompt': prompt,
+      'images': images
     }
 
     print('Prompt here')
@@ -269,6 +279,7 @@ Suggestions:
 
   if (data.get('getLinkedParagraph', False)):
     linked_prompt = get_linked_paragraph(output['h2']['paragraph'])
+
     linked = prompts.chat_scaffold([
       { "role": "user", "content": linked_prompt }
     ], [
@@ -289,9 +300,38 @@ Suggestions:
       }
     ])
 
-    output['h2']['paragraph'] = linked['content']['linked_paragraph']
+    linked_paragraph = linked['content']['linked_paragraph']
 
-  if (section.get('children', None) and len(section.get('children', []))):
+    split_linked_prompt = split_paragraph(linked_paragraph)
+    print(split_linked_prompt)
+    split_linked_paragraph = prompts.chat_scaffold([
+      { "role": "user", "content": split_linked_prompt }
+    ], [
+      {
+        "name": "get_linked_paragraph",
+        "description": "Get the generated linked paragraph",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "linked_paragraph": {
+              "type": "string",
+              "description": "The generated paragraph with potential anchor links opportunities",
+            },
+          },
+          "required": ["linked_paragraph"],
+          "additionalProperties": False,
+        },
+      }
+    ])
+
+    print(split_linked_paragraph)
+
+    try:
+      output['h2']['paragraph'] = split_linked_paragraph['content']['linked_paragraph']
+    except:
+      output['h2']['paragraph'] = split_linked_paragraph['content']
+
+  if (section.get('children', None) and len(section.get('children', [])) and include_h3):
     output['h3'] = []
     for child in section['children']:
       format = prompts.chat_scaffold([
@@ -313,12 +353,32 @@ Suggestions:
       ], titles_function)
 
       if (data['improveReadability']):
-        resp = prompts.chat_scaffold([
-          { "role": "user", "content": improve_readability(resp['content']['paragraph']) }
-        ])
+        resp = process_text_through_humanize(resp['content']['paragraph'])
+
+      split_linked_prompt = split_paragraph(resp['output'])
+      print(split_linked_prompt)
+      split_paragraph_resp = prompts.chat_scaffold([
+        { "role": "user", "content": split_linked_prompt }
+      ], [
+        {
+          "name": "get_linked_paragraph",
+          "description": "Get the split paragraph",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "linked_paragraph": {
+                "type": "string",
+                "description": "The split paragraph output",
+              },
+            },
+            "required": ["split_paragraph"],
+            "additionalProperties": False,
+          },
+        }
+      ])
 
       output['h3'].append({
-        'paragraph': resp['content'],
+        'paragraph': split_paragraph_resp['content']['split_paragraph'],
         'heading': child['name']
       })
 

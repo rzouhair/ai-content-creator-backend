@@ -1,12 +1,14 @@
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
+from content_generation.helpers.improval_prompts import generate_image, process_text_through_humanize
 from content_generation.helpers.post_prompts import generate_paragraph_image, generate_post_featured_image
 from content_generation.models import MEMORY_TYPES, Document, Memory, Output, Project, Prompt, Skill, Tag, Recipe
 from content_generation.serializers import DocumentGetSerializer, DocumentSerializer, MemorySerializer, OutputSerializer, ProjectSerializer, PromptSerializer, SkillGetSerializer, SkillSerializer, TagSerializer, RecipeSerializer, RecipeGetSerializer
 from core.clients import create_document, delete_document, nearest_neighbor_search, retrieve_document, retrieve_documents
 from keywordresearch.tasks import memory_file_analysis, memory_text_analysis, memory_youtube_analysis
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
 from youtube_transcript_api import YouTubeTranscriptApi
 from core.helpers import manual_pagination
@@ -90,9 +92,12 @@ def writeBlogPost(request):
 
         prompt = image_resp['content']
 
+        images = generate_image(prompt, number_of_images=4)
+
         return Response({
           'title': title,
-          'prompt': prompt or None
+          'prompt': prompt or None,
+          'images': images
         })
 
       return Response({
@@ -723,3 +728,35 @@ def recipesActions(request, _id=None):
       else: """
       recipe.delete()
       return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def humanize_content(request):
+  if request.method == 'POST':
+    data = request.data
+    if 'content' in data:
+        content = data['content']
+        
+        humanized_content = process_text_through_humanize(content)
+        return Response({'humanized_content': humanized_content})
+    else:
+        return Response({'error': 'Content not provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def generate_images(request):
+  if request.method == 'POST':
+    data = request.data
+    if 'prompt' in data:
+      prompt = data['prompt']
+      options = data.get('options', {
+        'model': 'V_1_TURBO',
+        'aspect_ratio': 'ASPECT_16_9',
+        'magic_prompt_option': 'OFF'
+      })
+      number_of_images = data.get('number_of_images', 1)
+      
+      generated_images = generate_image(prompt, options, number_of_images)
+      return Response({'images': generated_images})
+    else:
+        return Response({'error': 'Content not provided'}, status=status.HTTP_400_BAD_REQUEST)
